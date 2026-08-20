@@ -68,7 +68,13 @@ function generateNodes(numNodes) {
 function updatePlot() {
     const kernel = document.getElementById("kernel").value;
     const epsilon = parseFloat(document.getElementById("epsilon").value);
-    const nodesCount = parseInt(document.getElementById("nodes").value);
+    let nodesCount = parseInt(document.getElementById("nodes").value);
+
+// Enforce minimum
+if (nodesCount < 5) {
+    nodesCount = 5;
+    document.getElementById("nodes").value = 5;
+}
 
     const { xPoints, yPoints } = generateNodes(nodesCount);
 
@@ -96,21 +102,28 @@ function updatePlot() {
                 y: yDense,
                 mode: "lines",
                 name: "RBF Interpolation",
-                line: { color: "black", width: 2 }
+                line: { color: "black", width: 3 }   // solid black
             },
             {
                 x: xPoints,
                 y: yPoints,
                 mode: "markers",
                 name: "Nodes",
-                marker: { color: "red", size: 8 }
+                marker: {
+                    color: "white",       // clear fill
+                    size: 10,
+                    line: {
+                        color: "black",   // black outline
+                        width: 2
+                    }
+                }
             },
             {
                 x: xDense,
                 y: yTrue,
                 mode: "lines",
                 name: "Runge Function",
-                line: { color: "blue", dash: "dot", width: 2 }
+                line: { color: "red", dash: "dot", width: 3 }   // dotted red
             }
         ], {
             title: `Kernel: ${kernel} | ε = ${epsilon}`,
@@ -119,9 +132,9 @@ function updatePlot() {
             height: 500
         });
 
-    } catch (err) {
+        } catch (err) {
+        }
     }
-}
 
 // --- Live Event Listeners ---
 document.getElementById("kernel").addEventListener("change", updatePlot);
