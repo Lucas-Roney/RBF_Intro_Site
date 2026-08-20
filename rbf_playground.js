@@ -64,24 +64,36 @@ function generateNodes(numNodes) {
     return { xPoints, yPoints };
 }
 
+// --- Compute Infinity Norm Error ---
+function computeInfinityNorm(yDense, yTrue) {
+    let infError = 0;
+    for (let i = 0; i < yDense.length; i++) {
+        const err = Math.abs(yDense[i] - yTrue[i]);
+        if (err > infError) infError = err;
+    }
+    return infError;
+}
+
 // --- Main Update Function ---
 function updatePlot() {
     const kernel = document.getElementById("kernel").value;
-    const epsilon = parseFloat(document.getElementById("epsilon").value);
+    let epsilon = parseFloat(document.getElementById("epsilon").value);
     let nodesCount = parseInt(document.getElementById("nodes").value);
 
-// Enforce minimum
-if (nodesCount < 5) {
-    nodesCount = 5;
-    document.getElementById("nodes").value = 5;
-}
+    if (nodesCount < 5) {
+        nodesCount = 5;
+        document.getElementById("nodes").value = 5;
+    }
+    if (nodesCount > 200) {
+        nodesCount = 200;
+        document.getElementById("nodes").value = 200;
+    }
 
     const { xPoints, yPoints } = generateNodes(nodesCount);
 
     try {
         const rbf = new RBFInterpolator(xPoints, yPoints, epsilon, kernel);
 
-        // Dense evaluation grid
         let xDense = [];
         let yDense = [];
         for (let i = 0; i <= 400; i++) {
@@ -91,18 +103,17 @@ if (nodesCount < 5) {
         }
 
         const yTrue = xDense.map(rungeFunction);
+        const infError = computeInfinityNorm(yDense, yTrue);
 
-        // Clear previous plot
         Plotly.purge("plot-area");
 
-        // Plot
         Plotly.newPlot("plot-area", [
             {
                 x: xDense,
                 y: yDense,
                 mode: "lines",
                 name: "RBF Interpolation",
-                line: { color: "black", width: 3 }   // solid black
+                line: { color: "black", width: 3 }
             },
             {
                 x: xPoints,
@@ -110,12 +121,9 @@ if (nodesCount < 5) {
                 mode: "markers",
                 name: "Nodes",
                 marker: {
-                    color: "white",       // clear fill
+                    color: "white",
                     size: 10,
-                    line: {
-                        color: "black",   // black outline
-                        width: 2
-                    }
+                    line: { color: "black", width: 2 }
                 }
             },
             {
@@ -123,7 +131,7 @@ if (nodesCount < 5) {
                 y: yTrue,
                 mode: "lines",
                 name: "Runge Function",
-                line: { color: "red", dash: "dot", width: 3 }   // dotted red
+                line: { color: "red", dash: "dot", width: 3 }
             }
         ], {
             title: `Kernel: ${kernel} | ε = ${epsilon}`,
@@ -132,14 +140,104 @@ if (nodesCount < 5) {
             height: 500
         });
 
-        } catch (err) {
-        }
+        document.getElementById("error-display").innerText =
+            `${infError.toExponential(3)}`;
+
+    } catch (err) {
+        document.getElementById("error-display").innerText = "";
     }
+}
+
+// --- Best Epsilon Animation ---
+async function findBestEpsilon() {
+    const kernel = document.getElementById("kernel").value;
+    let nodesCount = parseInt(document.getElementById("nodes").value);
+
+    const { xPoints, yPoints } = generateNodes(nodesCount);
+
+    let bestEpsilon = 0.2;
+    let bestError = Infinity;
+
+    const delay = 8;   // fast animation
+    const step = 0.1;  // finer epsilon resolution
+
+    for (let epsilon = 0.2; epsilon <= 30; epsilon += step) {
+
+        try {
+            const rbf = new RBFInterpolator(xPoints, yPoints, epsilon, kernel);
+
+            let xDense = [];
+            let yDense = [];
+            for (let i = 0; i <= 200; i++) {
+                const x = -1 + 2 * (i / 200);
+                xDense.push(x);
+                yDense.push(rbf.predict(x));
+            }
+
+            const yTrue = xDense.map(rungeFunction);
+            const infError = computeInfinityNorm(yDense, yTrue);
+
+            // 🔴 LIVE ERROR UPDATE DURING ANIMATION
+            document.getElementById("error-display").innerText =
+                `${infError.toExponential(3)}`;
+
+            // Update slider visually during animation
+            document.getElementById("epsilon").value = epsilon.toFixed(2);
+
+            Plotly.react("plot-area", [
+                {
+                    x: xDense,
+                    y: yDense,
+                    mode: "lines",
+                    name: "RBF Interpolation",
+                    line: { color: "black", width: 3 }
+                },
+                {
+                    x: xPoints,
+                    y: yPoints,
+                    mode: "markers",
+                    name: "Nodes",
+                    marker: {
+                        color: "white",
+                        size: 10,
+                        line: { color: "black", width: 2 }
+                    }
+                },
+                {
+                    x: xDense,
+                    y: yTrue,
+                    mode: "lines",
+                    name: "Runge Function",
+                    line: { color: "red", dash: "dot", width: 3 }
+                }
+            ], {
+                title: `Kernel: ${kernel} | ε = ${epsilon.toFixed(2)}`,
+                xaxis: { title: "x" },
+                yaxis: { title: "y" },
+                height: 500
+            });
+
+            if (infError < bestError) {
+                bestError = infError;
+                bestEpsilon = epsilon;
+            }
+
+        } catch (err) {
+            continue;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, delay));
+    }
+
+    document.getElementById("epsilon").value = bestEpsilon.toFixed(2);
+    updatePlot();
+}
 
 // --- Live Event Listeners ---
 document.getElementById("kernel").addEventListener("change", updatePlot);
 document.getElementById("epsilon").addEventListener("input", updatePlot);
 document.getElementById("nodes").addEventListener("change", updatePlot);
+document.getElementById("best-epsilon-btn").addEventListener("click", findBestEpsilon);
 
 // --- Initial Plot ---
 updatePlot();

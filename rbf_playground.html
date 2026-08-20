@@ -45,12 +45,22 @@
         <label for="nodes">Number of Nodes</label>
         <input type="number" id="nodes" min="5" max="100" value="21">
 
+        <button id="best-epsilon-btn" class="control-btn">Best ε</button>
+
+        <div id="error-norm-box">
+           <div class="error-title">
+            &#x2225;f - s&#x2225;<sub>&#x221e;</sub> error
+        </div>
+
+            <div id="error-display" class="error-value">Calculating...</div>
+        </div>
+
+
     </div>
 
     <!-- Main Plot Area -->
     <div id="main">
-        <div id="plot-area">
-        </div>
+        <div id="plot-area"></div>
     </div>
 
 </div>

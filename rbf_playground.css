@@ -94,6 +94,27 @@ header {
     background: #555;
 }
 
+#error-norm-box {
+    margin-top: 95%;
+    padding: 10px 6px;
+    background: #f7f7f7;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.error-title {
+    font-size: 19px;
+    font-weight: bold;
+    margin-bottom: 6px;
+    color: #333;
+}
+
+.error-value {
+    font-size: 16px;
+    color: #000;
+}
+
 /* Main content */
 #main {
     flex: 1;
