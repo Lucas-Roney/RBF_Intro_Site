@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Radial Basis Function Playground</title>
+    <link rel="icon" type="image/x-icon" href="../curveIcon.png">
+    <link rel="stylesheet" href="rbf_playground.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/13.0.0/math.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="rbf_playground.js" defer></script>
+</head>
+
+<body>
+
+<header>
+    <!-- Left side: Circular Back Arrow -->
+    <div class="header-side">
+        <button type="button" class="header-btn icon-btn" onclick="location.href='../index.html'" title="Back">&#8592;</button>
+    </div>
+    
+    <div class="header-title">
+        Radial Basis Function Playground
+    </div>
+    
+    <!-- Right side: Kept empty -->
+    <div class="header-side right"></div>
+</header>
+
+<div id="container">
+
+    <!-- Sidebar Controls -->
+    <div id="sidebar">
+        <h2>Controls</h2>
+
+        <label for="TF">Test Function</label>
+        <select id="TF">
+            <option value="Runge">Runge Function</option>
+            <option value="Sine">Sine</option>
+            <option value="Abs">Absolute Value</option>
+            <option value="Poly">Polynomial</option>
+        </select>
+
+        <label for="kernel">Kernel</label>
+        <select id="kernel">
+            <option value="GA">Gaussian (GA)</option>
+            <option value="MQ">Multiquadric (MQ)</option>
+            <option value="IMQ">Inverse MQ (IMQ)</option>
+            <option value="IQ">Inverse Quadratic (IQ)</option>
+        </select>
+
+        <label for="epsilon">Shape Parameter ε</label>
+        <input type="range" id="epsilon" min="0.2" max="30" step="0.01" value="5">
+
+        <label for="nodes">Number of Nodes</label>
+        <input type="number" id="nodes" min="5" max="100" value="21">
+
+        <button id="best-epsilon-btn" class="control-btn">Best ε</button>
+
+        <div id="error-norm-box">
+           <div class="error-title">
+            &#x2225;f - s&#x2225;<sub>&#x221e;</sub> error
+        </div>
+
+            <div id="error-display" class="error-value">Calculating...</div>
+        </div>
+
+
+    </div>
+
+    <!-- Main Plot Area -->
+    <div id="main">
+        <div id="plot-area"></div>
+    </div>
+
+</div>
+
+<footer>
+    RBF Demo — **names go here**
+</footer>
+
+</body>
+</html>

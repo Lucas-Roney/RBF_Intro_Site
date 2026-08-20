@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RBF Learning Hub</title>
+    <link rel="icon" type="image/x-icon" href="curveIcon.png">
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+
+<body>
+
+<header>
+    <!-- Left side: Kept empty to balance the flexbox -->
+    <div class="header-side"></div>
+    
+    <div class="header-title">
+        Radial Basis Function Learning Hub
+    </div>
+    
+    <!-- Right side: Question mark button -->
+    <div class="header-side right">
+        <button type="button" class="header-btn icon-btn" title="Help">?</button>
+    </div>
+</header>
+
+<!-- Help Popup -->
+<div id="help-overlay"></div>
+
+<div id="help-popup">
+    <h2>About This Site</h2>
+    <p>This site offers an interactive introduction to Radial Basis Functions.</p>
+
+    <ul>
+        <li><strong>RBF Playground</strong> showcases different kernels and how they respond to the shape parameter ε. You can observe the infinity error live as ε changes. The best ε tool finds the ideal shape parameter for the chosen kernel and node count.</li>
+    </ul>
+
+    <button id="help-close-btn" class="header-btn">Close</button>
+</div>
+
+<div id="options-container">
+
+    <!-- Option 1 -->
+    <div class="option">
+        <img src="playground/playgroundOptionBG.png" alt="Placeholder Image">
+        <button onclick="location.href='playground/rbf_playground.html'">RBF Playground</button>
+    </div>
+
+    <!-- Option 2 -->
+    <div class="option">
+        <img src="dataInterpolation/dataInterpolationBG.jpg" alt="Placeholder Image">
+        <button onclick="location.href='dataInterpolation/data_Interpolation.html'">Data Interpolation</button>
+    </div>
+
+    <!-- Option 3 -->
+    <div class="option">
+        <img src="" alt="Placeholder Image">
+        <button id="opt3">TBD</button>
+    </div>
+
+    <!-- Option 4 -->
+    <div class="option">
+        <img src="" alt="Placeholder Image">
+        <button id="opt4">TBD</button>
+    </div>
+
+</div>
+
+<footer>
+    RBF Learning Hub — **names go here**
+</footer>
+
+</body>
+</html>

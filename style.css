@@ -1,0 +1,158 @@
+header {
+    background: #222;
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-side {
+    flex: 1; 
+}
+
+.header-side.right {
+    text-align: right; 
+}
+
+.header-title {
+    flex: 2;
+    text-align: center;
+    font-size: 1.8rem;
+    font-weight: bold;
+}
+
+.header-btn {
+    background: #444;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.2s;
+}
+
+.header-btn:hover {
+    background: #666;
+}
+
+.icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    padding: 0;
+    font-weight: bold;
+    font-size: 1.2rem;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Overlay behind popup */
+#help-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.55);
+    display: none;
+    z-index: 900;
+}
+
+/* Popup box */
+#help-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 20px 30px;
+    width: 32vw;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    display: none;
+    z-index: 1000;
+    text-align: center;
+}
+
+#help-popup h2 {
+    margin-top: 0;
+    font-size: 1.4rem;
+}
+
+#help-popup p {
+    font-size: 1rem;
+    margin-bottom: 20px;
+}
+
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+#options-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    padding: 40px;
+    flex-wrap: wrap;
+    max-width: 100%;
+    gap: 30px;
+    margin: 0 auto;
+    flex: 1;
+}
+
+.option {
+    width: 260px;
+    height: 260px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px;
+    margin: 20px;
+    text-align: center;
+}
+
+.option img {
+    width: 100%;
+    height: 70%;
+    background: #ccc; /* placeholder */
+    border-radius: 6px;
+}
+
+.option button {
+    width: 100%;
+    padding: 10px;
+    background: #333;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.option button:hover {
+    background: #555;
+}
+
+footer {
+    background: #222;
+    color: white;
+    padding: 10px;
+    text-align: center;
+    font-size: 0.9rem;
+    margin-top: auto;
+}
