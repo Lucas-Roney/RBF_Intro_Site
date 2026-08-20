@@ -1,5 +1,3 @@
-// Ctrl + f & .tofixed(10) to adjust error decimal place
-
 // --- Kernels (correct ε scaling) ---
 const Kernels = {
     GA: (r, epsilon) => Math.exp(-Math.pow(epsilon * r, 2)),
@@ -143,7 +141,7 @@ function updatePlot() {
         });
 
         document.getElementById("error-display").innerText =
-            `${infError.toFixed(10)}`;
+            `${infError.toExponential(3)}`;
 
     } catch (err) {
         document.getElementById("error-display").innerText = "";
@@ -179,9 +177,9 @@ async function findBestEpsilon() {
             const yTrue = xDense.map(rungeFunction);
             const infError = computeInfinityNorm(yDense, yTrue);
 
-            //  LIVE ERROR UPDATE DURING ANIMATION
+            // 🔴 LIVE ERROR UPDATE DURING ANIMATION
             document.getElementById("error-display").innerText =
-                `${infError.toFixed(10)}`;
+                `${infError.toExponential(3)}`;
 
             // Update slider visually during animation
             document.getElementById("epsilon").value = epsilon.toFixed(2);
@@ -232,67 +230,7 @@ async function findBestEpsilon() {
     }
 
     document.getElementById("epsilon").value = bestEpsilon.toFixed(2);
-
-    // Final plot with "ideal ε"
-    document.getElementById("plot-area").style.opacity = 0;
-    setTimeout(() => {
-    const kernelFinal = document.getElementById("kernel").value;
-    const { xPoints: xFinal, yPoints: yFinal } =
-        generateNodes(parseInt(document.getElementById("nodes").value));
-
-    const rbfFinal = new RBFInterpolator(xFinal, yFinal, bestEpsilon, kernelFinal);
-
-
-    // Dense grid
-    let xDenseFinal = [];
-    let yDenseFinal = [];
-    for (let i = 0; i <= 400; i++) {
-        const x = -1 + 2 * (i / 400);
-        xDenseFinal.push(x);
-        yDenseFinal.push(rbfFinal.predict(x));
-    }
-
-    const yTrueFinal = xDenseFinal.map(rungeFunction);
-    const infErrorFinal = computeInfinityNorm(yDenseFinal, yTrueFinal);
-
-    document.getElementById("error-display").innerText =
-        `${infErrorFinal.toFixed(10)}`;
-
-    Plotly.newPlot("plot-area", [
-        {
-            x: xDenseFinal,
-            y: yDenseFinal,
-            mode: "lines",
-            name: "RBF Interpolation",
-            line: { color: "black", width: 3 }
-        },
-        {
-            x: xFinal,
-            y: yFinal,
-            mode: "markers",
-            name: "Nodes",
-            marker: {
-                color: "white",
-                size: 10,
-                line: { color: "black", width: 2 }
-            }
-        },
-        {
-            x: xDenseFinal,
-            y: yTrueFinal,
-            mode: "lines",
-            name: "Runge Function",
-            line: { color: "red", dash: "dot", width: 3 }
-        }
-    ], {
-        title: `Kernel: ${kernelFinal} | ideal ε = ${bestEpsilon.toFixed(2)}`,
-        xaxis: { title: "x" },
-        yaxis: { title: "y" },
-        height: 500
-    });
-        document.getElementById("plot-area").style.opacity = 1;
-    }, 150);
-
+    updatePlot();
 }
 
 // --- Live Event Listeners ---
@@ -303,3 +241,8 @@ document.getElementById("best-epsilon-btn").addEventListener("click", findBestEp
 
 // --- Initial Plot ---
 updatePlot();
+
+// Help button placeholder
+//document.getElementById("helpBtn")?.addEventListener("click", () => {
+//    console.log("Help button clicked.");
+//});
