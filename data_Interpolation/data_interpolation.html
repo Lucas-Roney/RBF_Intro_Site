@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tidal Data Interpolation</title>
+    <link rel="icon" type="image/x-icon" href="../curveIcon.png">
+    <link rel="stylesheet" href="data_Interpolation.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/13.0.0/math.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    <script src="data_interpolation.js" defer></script>
+</head>
+
+<body>
+
+<header>
+    <div class="header-side">
+        <button type="button" class="header-btn" onclick="location.href='../index.html'" title="Back">&#8592;</button>
+    </div>
+
+    <div class="header-title">
+        Tidal Data Interpolation
+    </div>
+
+    <div class="header-side right">
+        <button id="helpBtn" class="header-btn icon-btn" title="Help">?</button>
+    </div>
+</header>
+
+<!-- Help Popup -->
+<div id="help-overlay"></div>
+
+<div id="help-popup">
+    <h2>About Tidal Interpolation</h2>
+    <p>
+        This tool demonstrates how Radial Basis Functions can be used to interpolate missing
+        sections of real-world tidal data. You can cut out a portion of the dataset and use
+        RBF interpolation to reconstruct the missing values.
+    </p>
+
+    <ul class="no-bullets">
+        <li><strong>Load Data:</strong> The tidal dataset loads automatically.</li>
+        <li><strong>Cut Tools:</strong> Remove a section manually or by selecting a region.</li>
+        <li><strong>Interpolation:</strong> Choose a kernel and ε to fill the missing gap.</li>
+        <li><strong>Best ε:</strong> Automatically finds the ideal shape parameter.</li>
+    </ul>
+
+    <button id="help-close-btn" class="header-btn">Close</button>
+</div>
+
+<div id="container">
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <h2>Controls</h2>
+
+        <button id="show-raw-btn" class="control-btn">Show Raw Data</button>
+
+        <label>Manual Cut Section</label>
+        <input type="text" id="cut-time-start" placeholder="Start time (YYYY-MM-DD HH:MM)">
+        <input type="text" id="cut-time-end" placeholder="End time (YYYY-MM-DD HH:MM)">
+        <button id="cut-time-btn" class="control-btn">Cut Section</button>
+
+        <label for="kernel">Kernel</label>
+        <select id="kernel">
+            <option value="GA">Gaussian (GA)</option>
+            <option value="MQ">Multiquadric (MQ)</option>
+            <option value="IMQ">Inverse MQ (IMQ)</option>
+            <option value="IQ">Inverse Quadratic (IQ)</option>
+        </select>
+
+        <label for="epsilon">Shape Parameter ε</label>
+        <input type="range" id="epsilon" min="0.2" max="30" step="0.01" value="5">
+
+        <button id="best-epsilon-btn" class="control-btn">Best ε</button>
+
+        <div id="error-norm-box">
+            <div class="error-title">Infinity Norm Error</div>
+            <div id="error-display" class="error-value">---</div>
+        </div>
+    </div>
+
+    <!-- Main Plot -->
+    <div id="main">
+        <div id="plot-area"></div>
+    </div>
+
+</div>
+
+<footer>
+    RBF Demo — Roney, Blazejewski, Palmer
+</footer>
+
+</body>
+</html>

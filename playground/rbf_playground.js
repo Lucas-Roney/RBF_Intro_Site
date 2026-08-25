@@ -136,7 +136,7 @@ function updatePlot() {
                 line: { color: "red", dash: "dot", width: 3 }
             }
         ], {
-            title: `Kernel: ${kernel} (ε = ${epsilon})`,
+            title: `Kernel: ${kernel} | ε = ${epsilon}`,
             xaxis: { title: "x" },
             yaxis: { title: "y" },
             height: 500
@@ -213,7 +213,7 @@ async function findBestEpsilon() {
                     line: { color: "red", dash: "dot", width: 3 }
                 }
             ], {
-                title: `Kernel: ${kernel} (ε = ${epsilon.toFixed(2)})`,
+                title: `Kernel: ${kernel} | ε = ${epsilon.toFixed(2)}`,
                 xaxis: { title: "x" },
                 yaxis: { title: "y" },
                 height: 500
@@ -285,7 +285,7 @@ async function findBestEpsilon() {
             line: { color: "red", dash: "dot", width: 3 }
         }
     ], {
-        title: `Kernel: ${kernel} (ε = ${epsilon.toFixed(2)})`,
+        title: `Kernel: ${kernelFinal} | ideal ε = ${bestEpsilon.toFixed(2)}`,
         xaxis: { title: "x" },
         yaxis: { title: "y" },
         height: 500
