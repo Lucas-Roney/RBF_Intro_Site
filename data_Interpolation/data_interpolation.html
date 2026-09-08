@@ -38,9 +38,9 @@
     </p>
 
     <ul class="no-bullets">
-        <li><strong>Load Data:</strong> The tidal dataset loads automatically.</li>
-        <li><strong>Cut Tools:</strong> Remove a section manually or by selecting a region.</li>
-        <li><strong>Interpolation:</strong> Choose a kernel and ε to fill the missing gap.</li>
+        <li><strong>Show Raw Data:</strong> Reloads the tidal dataset.</li>
+        <li><strong>Cut Section:</strong> Remove a section manually.</li>
+        <li><strong>Interpolation:</strong> Choose an ε to fill the missing gap.</li>
         <li><strong>Best ε:</strong> Automatically finds the ideal shape parameter.</li>
     </ul>
 
@@ -62,9 +62,6 @@
         <label for="kernel">Kernel</label>
         <select id="kernel">
             <option value="MQ">Multiquadric (MQ)</option>
-            <option value="IMQ">Inverse MQ (IMQ)</option>
-            <option value="IQ">Inverse Quadratic (IQ)</option>
-            <option value="GA">Gaussian (GA)</option>
         </select>
 
         <label for="epsilon">Shape Parameter ε</label>
