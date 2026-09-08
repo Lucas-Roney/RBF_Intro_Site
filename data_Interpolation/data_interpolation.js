@@ -159,34 +159,31 @@ document.getElementById("cut-time-btn").addEventListener("click", () => {
     }
 
     const tStart = document.getElementById("cut-time-start").value;
-    const tEnd = document.getElementById("cut-time-end").value;
-
-    if (!tStart || !tEnd) {
-        alert("Enter both times");
+    if (!tStart) {
+        alert("Enter a start time");
         return;
     }
 
     let startDate = new Date(tStart.replace(" ", "T"));
-    let endDate = new Date(tEnd.replace(" ", "T"));
-
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    if (isNaN(startDate.getTime())) {
         alert("Invalid format: YYYY-MM-DD HH:MM");
         return;
     }
 
-    const startMinutes = (startDate - firstTimestamp) / 60000;
-    const endMinutes = (endDate - firstTimestamp) / 60000;
+    // Define 1-week cut region
+    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+    const endDate = new Date(startDate.getTime() + oneWeekMs);
 
-    let cutCount = 0;
-    for (let i = 0; i < rawTimes.length; i++) {
-        if (rawTimes[i] >= startMinutes && rawTimes[i] <= endMinutes) {
-            cutMask[i] = true;
-            cutCount++;
-        }
-    }
+    // Mark cutMask for exactly 1 week
+    cutMask = rawDates.map(d => (d >= startDate && d <= endDate));
 
-    console.log(`Cut ${cutCount} points`);
+    console.log("Cut region:", startDate, "to", endDate);
+
+    // Show the cut region visually
     plotRawData();
+
+    // Now interpolate over the cut region
+    interpolate();
 });
 
 
@@ -258,196 +255,153 @@ function interpolate() {
     const epsilon = parseFloat(document.getElementById("epsilon").value);
 
     // -----------------------------
-    // User selects ONLY a start date
+    // Determine cut boundaries from cutMask
     // -----------------------------
-    const tStart = document.getElementById("cut-time-start").value;
-    if (!tStart) {
-        alert("Enter a start date");
+    let cutStartDate = null;
+    let cutEndDate = null;
+
+    for (let i = 0; i < cutMask.length; i++) {
+        if (cutMask[i]) {
+            if (cutStartDate === null) cutStartDate = rawDates[i];
+            cutEndDate = rawDates[i];
+        }
+    }
+
+    if (!cutStartDate || !cutEndDate) {
+        console.log("No cut region defined.");
         return;
     }
 
-    const startDate = new Date(tStart.replace(" ", "T"));
-    if (isNaN(startDate.getTime())) {
-        alert("Invalid format: YYYY-MM-DD HH:MM");
-        return;
-    }
-
     // -----------------------------
-    // Define 1-week cut region
+    // Extract REAL cut nodes
     // -----------------------------
-    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
-
-    const cutStartDate = startDate;
-    const cutEndDate = new Date(startDate.getTime() + oneWeekMs);
-
-    // -----------------------------
-    // Mark cutMask for exactly 1 week
-    // -----------------------------
-    cutMask = rawDates.map(d => (d >= cutStartDate && d <= cutEndDate));
-
-    // -----------------------------
-    // Define interpolation window:
-    // 1 week before + 1 week after
-    // -----------------------------
-    const leftWindowStart = new Date(cutStartDate.getTime() - oneWeekMs);
-    const leftWindowEnd   = cutStartDate;
-
-    const rightWindowStart = cutEndDate;
-    const rightWindowEnd   = new Date(cutEndDate.getTime() + oneWeekMs);
-
-    // -----------------------------
-    // Build full kept data (for plotting)
-    // -----------------------------
-    const fullKept = rawTimes
+    const cutNodes = rawTimes
         .map((t, i) => ({
             t,
             level: rawLevels[i],
             date: rawDates[i],
-            cut: cutMask[i]
+            index: i
         }))
-        .filter(p => !p.cut)   // keep everything except the cut
-        .sort((a, b) => a.t - b.t);
+        .filter(p => cutMask[p.index]);
 
-    // -----------------------------
-    // Build LOCAL kept data (for RBF only)
-    // -----------------------------
-    const localKept = fullKept.filter(p => {
-        const d = p.date;
-        return (
-            (d >= leftWindowStart && d <= leftWindowEnd) ||
-            (d >= rightWindowStart && d <= rightWindowEnd)
-        );
-    });
-
-    if (localKept.length < 2) {
-        alert("Not enough local data for interpolation.");
+    if (cutNodes.length < 3) {
+        alert("Cut region too small");
         return;
     }
 
     // -----------------------------
-    // Build guide points from actual cut timestamps
+    // Downsample REAL cut nodes
     // -----------------------------
-    const guidePoints = [];
+    const stride = 5; // adjust as needed
+    const downsampledCut = cutNodes.filter((_, i) => i % stride === 0);
 
-    const leftBoundary = fullKept.find(p => p.date < cutStartDate);
-    const rightBoundary = fullKept.find(p => p.date > cutEndDate);
+    // -----------------------------
+    // Find boundary endpoints
+    // -----------------------------
+    const leftBoundary = rawTimes
+        .map((t, i) => ({ t, level: rawLevels[i], date: rawDates[i] }))
+        .filter(p => p.date < cutStartDate)
+        .slice(-1)[0];
 
-    if (leftBoundary && rightBoundary) {
-        const leftLevel = leftBoundary.level;
-        const rightLevel = rightBoundary.level;
+    const rightBoundary = rawTimes
+        .map((t, i) => ({ t, level: rawLevels[i], date: rawDates[i] }))
+        .filter(p => p.date > cutEndDate)[0];
 
-        // Collect actual cut timestamps
-        const cutPoints = rawTimes
-            .map((t, i) => ({
-                t,
-                date: rawDates[i],
-                cut: cutMask[i]
-            }))
-            .filter(p => p.cut);
-
-        // Assign placeholder levels using linear interpolation
-        for (let i = 0; i < cutPoints.length; i++) {
-            const p = cutPoints[i];
-
-            const alpha = (p.date - cutStartDate) / (cutEndDate - cutStartDate);
-
-            const guideLevel = leftLevel * (1 - alpha) + rightLevel * alpha;
-
-            guidePoints.push({
-                t: p.t,
-                level: guideLevel,
-                date: p.date,
-                cut: true
-            });
-        }
+    if (!leftBoundary || !rightBoundary) {
+        alert("Missing boundary points");
+        return;
     }
 
-    // Full kept data for plotting (full timeline)
-    const keptTimesFull = fullKept.map(p => p.t);
-    const keptLevelsFull = fullKept.map(p => p.level);
+    // -----------------------------
+    // Build RBF training set
+    // -----------------------------
+    const trainTimes = [
+        leftBoundary.t,
+        ...downsampledCut.map(p => p.t),
+        rightBoundary.t
+    ];
 
-
-    // Combine local kept data + actual cut timestamps (with placeholder levels)
-    const localPlusGuides = localKept.concat(guidePoints);
-
-    // Downsample for stability
-    const keptTimes = localPlusGuides.map(p => p.t).filter((_, i) => i % 5 === 0);
-    const keptLevels = localPlusGuides.map(p => p.level).filter((_, i) => i % 5 === 0);
-
+    const trainLevels = [
+        leftBoundary.level,
+        ...downsampledCut.map(p => p.level),
+        rightBoundary.level
+    ];
 
     // -----------------------------
-    // Build RBF interpolator
+    // Train RBF
     // -----------------------------
+    let rbf;
     try {
-        const rbf = new RBFInterpolator(keptTimes, keptLevels, epsilon, kernel);
-
-        let interpTimes = [];
-        let interpLevels = [];
-
-        for (let i = 0; i < rawTimes.length; i++) {
-            if (cutMask[i]) {
-                const t = rawTimes[i];
-                interpTimes.push(t);
-                interpLevels.push(rbf.predict(t));
-            }
-        }
-
-        // -----------------------------
-        // Red cut lines (shapes)
-        // -----------------------------
-        const shapes = [
-            {
-                type: "line",
-                x0: cutStartDate,
-                x1: cutStartDate,
-                y0: 0,
-                y1: 1,
-                yref: "paper",
-                line: { color: "red", width: 2, dash: "dot" }
-            },
-            {
-                type: "line",
-                x0: cutEndDate,
-                x1: cutEndDate,
-                y0: 0,
-                y1: 1,
-                yref: "paper",
-                line: { color: "red", width: 2, dash: "dot" }
-            }
-        ];
-
-        // -----------------------------
-        // Plot FULL timeline + interpolation
-        // -----------------------------
-        Plotly.react("plot-area", [
-            {
-                x: keptTimesFull.map(t => new Date(firstTimestamp.getTime() + t * 60000)),
-                y: keptLevelsFull,
-                mode: "lines+markers",
-                name: "Kept Data (Full Timeline)",
-                line: { color: "blue", width: 2 }
-            },
-            {
-                x: interpTimes.map(t => new Date(firstTimestamp.getTime() + t * 60000)),
-                y: interpLevels,
-                mode: "lines",
-                name: "Interpolation",
-                line: { color: "red", dash: "dot", width: 3 },
-            }
-
-        ], {
-            title: `Kernel: ${kernel} (ε = ${epsilon})`,
-            xaxis: { title: "Date & Time" },
-            yaxis: { title: "Water Level (m)" },
-            height: 500,
-            shapes: shapes
-        });
-
-    } catch (error) {
-        console.error("Interpolation failed:", error);
-        alert(`Interpolation failed: ${error.message}`);
+        rbf = new RBFInterpolator(trainTimes, trainLevels, epsilon, kernel);
+    } catch (err) {
+        alert("RBF failed: " + err.message);
+        return;
     }
+
+    // -----------------------------
+    // Predict ONLY for cut nodes
+    // -----------------------------
+    const interpTimes = cutNodes.map(p => p.t);
+    const interpLevels = cutNodes.map(p => rbf.predict(p.t));
+
+    // -----------------------------
+    // Plot
+    // -----------------------------
+    const keptNodes = rawTimes
+        .map((t, i) => ({
+            t,
+            level: rawLevels[i],
+            date: rawDates[i]
+        }))
+        .filter((_, i) => !cutMask[i]);
+
+    const shapes = [
+        {
+            type: "line",
+            x0: cutStartDate,
+            x1: cutStartDate,
+            y0: 0,
+            y1: 1,
+            yref: "paper",
+            line: { color: "red", width: 2, dash: "dot" }
+        },
+        {
+            type: "line",
+            x0: cutEndDate,
+            x1: cutEndDate,
+            y0: 0,
+            y1: 1,
+            yref: "paper",
+            line: { color: "red", width: 2, dash: "dot" }
+        }
+    ];
+
+    Plotly.react("plot-area", [
+        {
+            x: keptNodes.map(p => p.date),
+            y: keptNodes.map(p => p.level),
+            mode: "lines+markers",
+            name: "Kept Data",
+            line: { color: "blue", width: 2 }
+        },
+        {
+            x: interpTimes.map(t => new Date(firstTimestamp.getTime() + t * 60000)),
+            y: interpLevels,
+            mode: "lines",
+            name: "Interpolation",
+            line: { color: "red", dash: "dot", width: 3 }
+        }
+    ], {
+        title: `Kernel: ${kernel} (ε = ${epsilon})`,
+        xaxis: { title: "Date & Time" },
+        yaxis: { title: "Water Level (m)" },
+        height: 500,
+        shapes: shapes
+    });
 }
+
+
+
 
 
 document.getElementById("cut-time-btn").addEventListener("click", interpolate);
