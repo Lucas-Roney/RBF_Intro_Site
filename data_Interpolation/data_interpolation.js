@@ -144,8 +144,12 @@ function plotRawData() {
         title: "Tidal Data (Downsampled)",
         xaxis: { title: "Date & Time" },
         yaxis: { title: "Water Level (m)" },
+        autosize: false,
+        width: 1058,
         height: 500,
-        shapes: shapes
+        height: 500,
+        shapes: shapes,
+        showlegend: true
     });
 }
 
@@ -204,7 +208,7 @@ async function findBestEpsilon() {
 
     // Epsilon sweep
     const epsilons = [];
-    for (let e = 0.1; e <= 30; e += 0.1) epsilons.push(e);
+    for (let e = 0.1; e <= 10; e += 0.05) epsilons.push(e);
 
     let bestE = null;
     let bestErr = Infinity;
@@ -511,6 +515,9 @@ function interpolate() {
         y: rawLevels.map((lvl, i) => cutMask[i] ? null : lvl),
         mode: "lines",
         name: "Kept Data",
+        autosize: false,
+        width: 1058,
+        height: 500,
         line: { color: "blue", width: 2 },
         connectgaps: false
     },
@@ -519,8 +526,11 @@ function interpolate() {
     {
         x: denseInterpTimes.map(t => new Date(firstTimestamp.getTime() + t * 60000)),
         y: denseInterpLevels,
+        autosize: false,
+        width: 1058,
+        height: 500,
         mode: "lines",
-        name: "Interpolation (Smooth)",
+        name: "Interpolation",
         line: { color: "red", width: 2, dash: "dot" }
     },
 
@@ -529,8 +539,11 @@ function interpolate() {
     {
         x: cutNodes.map(p => p.date),
         y: cutNodes.map(p => p.level),
+        autosize: false,
+        width: 1058,
+        height: 500,
         mode: "lines",
-        name: "Cut Data (Real)",
+        name: "Cut Data",
         line: { color: "rgba(0, 0, 255, 0.3)", width: 2 }
     }
 
