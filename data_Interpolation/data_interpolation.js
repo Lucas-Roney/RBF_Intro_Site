@@ -377,27 +377,41 @@ function interpolate() {
     ];
 
     Plotly.react("plot-area", [
-        {
-            x: keptNodes.map(p => p.date),
-            y: keptNodes.map(p => p.level),
-            mode: "lines+markers",
-            name: "Kept Data",
-            line: { color: "blue", width: 2 }
-        },
-        {
-            x: interpTimes.map(t => new Date(firstTimestamp.getTime() + t * 60000)),
-            y: interpLevels,
-            mode: "lines",
-            name: "Interpolation",
-            line: { color: "red", dash: "dot", width: 3 }
-        }
-    ], {
-        title: `Kernel: ${kernel} (ε = ${epsilon})`,
-        xaxis: { title: "Date & Time" },
-        yaxis: { title: "Water Level (m)" },
-        height: 500,
-        shapes: shapes
-    });
+    // 1. Kept data (solid blue)
+    {
+        x: keptNodes.map(p => p.date),
+        y: keptNodes.map(p => p.level),
+        mode: "lines",
+        name: "Kept Data",
+        line: { color: "blue", width: 2 }
+    },
+
+    // 2. Interpolation (dotted red)
+    {
+        x: interpTimes.map(t => new Date(firstTimestamp.getTime() + t * 60000)),
+        y: interpLevels,
+        mode: "lines",
+        name: "Interpolation",
+        line: { color: "red", width: 2, dash: "dot" }
+    },
+
+    // 3. Real cut data (faded blue)
+    {
+        x: cutNodes.map(p => p.date),
+        y: cutNodes.map(p => p.level),
+        mode: "lines",
+        name: "Cut Data (Real)",
+        line: { color: "rgba(0, 0, 255, 0.3)", width: 2 }
+    }
+
+], {
+    title: `Kernel: ${kernel} (ε = ${epsilon})`,
+    xaxis: { title: "Date & Time" },
+    yaxis: { title: "Water Level (m)" },
+    height: 500,
+    shapes: shapes
+});
+
 }
 
 
