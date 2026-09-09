@@ -27,8 +27,14 @@ class RBFInterpolator {
         this.xData = xData;
         this.yData = yData;
         this.epsilon = epsilon;
-        this.kernel = Kernels[kernelName];
-        this.weights = this.computeWeights();
+        this.kernelName = kernelName;
+
+        if (this.kernelName === "POLY") {
+            this.weights = []; // No linear solver needed for Lagrange polynomial
+        } else {
+            this.kernel = Kernels[kernelName];
+            this.weights = this.computeWeights();
+        }
     }
 
     computeWeights() {
@@ -51,6 +57,22 @@ class RBFInterpolator {
     }
 
     predict(xVal) {
+        if (this.kernelName === "POLY") {
+            let total = 0;
+            const n = this.xData.length;
+
+            for (let i = 0; i < n; i++) {
+                let lag = 1;
+                for (let j = 0; j < n; j++) {
+                    if (i !== j) {
+                        lag *= (xVal - this.xData[j]) / (this.xData[i] - this.xData[j]);
+                    }
+                }
+                total += lag * this.yData[i];
+            }
+            return total;
+        }
+
         let total = 0;
         for (let j = 0; j < this.xData.length; j++) {
             const r = Math.abs(xVal - this.xData[j]);
@@ -482,6 +504,136 @@ async function findBestEpsilon() {
 
 }
 
+// --- Best Nodes Animation (Polynomial Only) ---
+async function findBestNodesPoly() {
+    const funcName = document.getElementById("test-function").value;
+    const f = TestFunctions[funcName];
+
+    let bestNodes = 5;
+    let bestError = Infinity;
+    const delay = 80; // Animation frame delay in ms
+
+    for (let nodes = 5; nodes <= 30; nodes++) {
+        const { xPoints, yPoints, left, right } = generateNodes(nodes);
+        const poly = new RBFInterpolator(xPoints, yPoints, 0, "POLY");
+
+        let xDense = [];
+        let yDense = [];
+        for (let i = 0; i <= 400; i++) {
+            const x = left + (right - left) * (i / 400);
+            xDense.push(x);
+            yDense.push(poly.predict(x));
+        }
+
+        const yTrue = xDense.map(f);
+        const infError = computeInfinityNorm(yDense, yTrue);
+
+        // Update UI during sweep
+        document.getElementById("nodes").value = nodes;
+        document.getElementById("error-display").innerText = infError.toFixed(10);
+
+        Plotly.react("plot-area", [
+            {
+                x: xDense,
+                y: yDense,
+                mode: "lines",
+                name: "Polynomial Interpolation",
+                line: { color: "black", width: 3 }
+            },
+            {
+                x: xPoints,
+                y: yPoints,
+                mode: "markers",
+                name: "Nodes",
+                marker: {
+                    color: "white",
+                    size: 10,
+                    line: { color: "black", width: 2 }
+                }
+            },
+            {
+                x: xDense,
+                y: yTrue,
+                mode: "lines",
+                name: "True Function",
+                line: { color: "red", dash: "dot", width: 3 }
+            }
+        ], {
+            title: `Polynomial Interpolation (Lagrange) | Nodes: ${nodes}`,
+            xaxis: { title: "x" },
+            yaxis: { title: "y" },
+            height: 500
+        });
+
+        // Track best nodes
+        if (infError < bestError) {
+            bestError = infError;
+            bestNodes = nodes;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, delay));
+    }
+
+    // Set input UI to optimal value
+    document.getElementById("nodes").value = bestNodes;
+
+    // Smooth opacity transition to the final plot
+    document.getElementById("plot-area").style.opacity = 0;
+
+    setTimeout(() => {
+        const { xPoints: xFinal, yPoints: yFinal, left, right } = generateNodes(bestNodes);
+        const polyFinal = new RBFInterpolator(xFinal, yFinal, 0, "POLY");
+
+        let xDenseFinal = [];
+        let yDenseFinal = [];
+        for (let i = 0; i <= 400; i++) {
+            const x = left + (right - left) * (i / 400);
+            xDenseFinal.push(x);
+            yDenseFinal.push(polyFinal.predict(x));
+        }
+
+        const yTrueFinal = xDenseFinal.map(f);
+        const infErrorFinal = computeInfinityNorm(yDenseFinal, yTrueFinal);
+
+        document.getElementById("error-display").innerText = infErrorFinal.toFixed(10);
+
+        Plotly.newPlot("plot-area", [
+            {
+                x: xDenseFinal,
+                y: yDenseFinal,
+                mode: "lines",
+                name: "Polynomial Interpolation",
+                line: { color: "black", width: 3 }
+            },
+            {
+                x: xFinal,
+                y: yFinal,
+                mode: "markers",
+                name: "Nodes",
+                marker: {
+                    color: "white",
+                    size: 10,
+                    line: { color: "black", width: 2 }
+                }
+            },
+            {
+                x: xDenseFinal,
+                y: yTrueFinal,
+                mode: "lines",
+                name: "True Function",
+                line: { color: "red", dash: "dot", width: 3 }
+            }
+        ], {
+            title: `Polynomial Interpolation (Lagrange) | Ideal Nodes: ${bestNodes}`,
+            xaxis: { title: "x" },
+            yaxis: { title: "y" },
+            height: 500
+        });
+
+        document.getElementById("plot-area").style.opacity = 1;
+    }, 150);
+}
+
 // --- Best Epsilon Animation 2D ---
 async function findBestEpsilon2D() {
     const kernel = document.getElementById("kernel").value;
@@ -602,14 +754,6 @@ document.getElementById("kernel").addEventListener("change", handleUpdate);
 document.getElementById("epsilon").addEventListener("input", handleUpdate);
 document.getElementById("nodes").addEventListener("change", handleUpdate);
 document.getElementById("test-function").addEventListener("change", handleUpdate);
-document.getElementById("best-epsilon-btn").addEventListener("click", () => {
-    const is2D = document.getElementById("dimension-toggle").checked;
-    if (is2D) {
-        findBestEpsilon2D();
-    } else {
-        findBestEpsilon();
-    }
-});
 
 const functionSelect = document.getElementById("test-function");
 
@@ -649,6 +793,44 @@ document.getElementById("dimension-toggle").addEventListener("change", () => {
     `;
 
     updatePlot2D();
+});
+
+const actionBtn = document.getElementById("best-epsilon-btn");
+
+function updateUIState() {
+    const is2D = document.getElementById("dimension-toggle").checked;
+    const kernel = document.getElementById("kernel").value;
+    const isPoly = (kernel === "POLY");
+
+    // Disable Epsilon slider for Polynomial mode
+    document.getElementById("epsilon").disabled = isPoly;
+
+    // Dynamically re-label button based on selected kernel
+    if (isPoly) {
+        actionBtn.innerText = "Find Best Nodes";
+    } else {
+        actionBtn.innerText = "Find Best ε";
+    }
+}
+
+// Attach UI handler to kernel selector
+document.getElementById("kernel").addEventListener("change", () => {
+    updateUIState();
+    handleUpdate();
+});
+
+// Route click action based on active kernel
+actionBtn.addEventListener("click", () => {
+    const is2D = document.getElementById("dimension-toggle").checked;
+    const kernel = document.getElementById("kernel").value;
+
+    if (kernel === "POLY") {
+        findBestNodesPoly();
+    } else if (is2D) {
+        findBestEpsilon2D();
+    } else {
+        findBestEpsilon();
+    }
 });
 
 
