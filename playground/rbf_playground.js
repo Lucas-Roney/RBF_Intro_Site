@@ -289,49 +289,41 @@ function updatePlot2D(forceEpsilon = null) {
 
         Plotly.purge("plot-area");
 
-        Plotly.newPlot("plot-area", [
-            {
-                x: xGrid,
-                y: yGrid,
-                z: zTrue,
-                type: "surface",
-                colorscale: "Viridis",
-                showscale: false,
-                name: "True Function",
-                scene: "scene"
-            },
-            {
-                x: xGrid,
-                y: yGrid,
-                z: zInterp,
-                type: "surface",
-                colorscale: "Spectral",
-                showscale: false,
-                name: "Interpolant",
-                scene: "scene2"
+        // Build error surface
+        let errSurface = [];
+        for (let i = 0; i < N; i++) {
+            let row = [];
+            for (let j = 0; j < N; j++) {
+                row.push(zInterp[i][j] - zTrue[i][j]);  // signed error
             }
-        ], {
-            title: "True vs Interpolated Surface",
+            errSurface.push(row);
+        }
+
+        Plotly.purge("plot-area");
+
+        Plotly.newPlot("plot-area", [{
+            x: xGrid,
+            y: yGrid,
+            z: zInterp,
+            surfacecolor: errSurface, 
+            type: "surface",
+            colorscale: "RdBu",
+            showscale: true,
+            name: "Interpolant (Error‑Coded)"
+        }], {
+            title: `Interpolant Colored by Signed Error | Kernel: ${kernel} (ε = ${epsilon.toFixed(2)})`,
             height: 500,
-
-            grid: { rows: 1, columns: 2 },
-
             scene: {
-                domain: { x: [0, 0.45], y: [0, 1] },
                 xaxis: { title: "x" },
                 yaxis: { title: "y" },
-                zaxis: { title: "True z" }
-            },
-
-            scene2: {
-                domain: { x: [0.55, 1], y: [0, 1] },
-                xaxis: { title: "x" },
-                yaxis: { title: "y" },
-                zaxis: { title: "Interpolated z" }
+                zaxis: { title: "Interpolant" }
             }
         });
 
-        document.getElementById("error-display").innerText = "—";
+
+
+        const infError2D = computeInfinityNorm2D(zInterp, zTrue);
+        document.getElementById("error-display").innerText = infError2D.toFixed(10);
 
     } catch (err) {
         document.getElementById("error-display").innerText = "";
@@ -494,6 +486,7 @@ async function findBestEpsilon() {
 async function findBestEpsilon2D() {
     const kernel = document.getElementById("kernel").value;
     let nodesCount = parseInt(document.getElementById("nodes").value);
+
     let bestEpsilon = 0.1;
     let bestError = Infinity;
 
@@ -512,6 +505,7 @@ async function findBestEpsilon2D() {
     for (let i = 0; i < N; i++) {
         const x = -1 + 2 * (i / (N - 1));
         xGrid.push(x);
+
         let row = [];
         for (let j = 0; j < N; j++) {
             const y = -1 + 2 * (j / (N - 1));
@@ -521,6 +515,7 @@ async function findBestEpsilon2D() {
         zTrue.push(row);
     }
 
+    // Sweep epsilon
     for (let epsilon = 0.1; epsilon <= 10; epsilon += step) {
         try {
             const rbf2d = new RBFInterpolator2D(pts, vals, epsilon, kernel);
@@ -534,6 +529,16 @@ async function findBestEpsilon2D() {
                 zInterp.push(row);
             }
 
+            // Compute error surface
+            let errSurface = [];
+            for (let i = 0; i < N; i++) {
+                let row = [];
+                for (let j = 0; j < N; j++) {
+                    row.push(zInterp[i][j] - zTrue[i][j]); // signed error
+                }
+                errSurface.push(row);
+            }
+
             const infError = computeInfinityNorm2D(zInterp, zTrue);
 
             // Live error update
@@ -543,13 +548,14 @@ async function findBestEpsilon2D() {
             // Update slider visually
             document.getElementById("epsilon").value = epsilon.toFixed(2);
 
-            // Live plot update
+            // Live plot update (interpolant height, error color)
             Plotly.react("plot-area", [{
                 x: xGrid,
                 y: yGrid,
-                z: zInterp,
+                z: zInterp,                // height = interpolant
+                surfacecolor: errSurface,  // color = signed error
                 type: "surface",
-                colorscale: "Spectral",
+                colorscale: "RdBu",        // red = positive, blue = negative
                 showscale: false
             }], {
                 title: `2D RBF | Kernel: ${kernel} (ε = ${epsilon.toFixed(2)})`,
@@ -560,8 +566,6 @@ async function findBestEpsilon2D() {
                     zaxis: { title: "z" }
                 }
             });
-
-
 
             if (infError < bestError) {
                 bestError = infError;
@@ -578,9 +582,10 @@ async function findBestEpsilon2D() {
     // Set slider to best ε
     document.getElementById("epsilon").value = bestEpsilon.toFixed(2);
 
-    // Final plot
+    // Final plot using your normal 2D renderer
     updatePlot2D(bestEpsilon);
 }
+
 
 
 // --- Live Event Listeners ---
