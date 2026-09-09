@@ -16,6 +16,11 @@ const TestFunctions = {
     Poly: x => 1.5*Math.pow(x,9) - 4*Math.pow(x,7) - Math.pow(x,3) - Math.pow(x,2) + 8*x
 };
 
+const TestFunctions2D = {
+    Runge2D: (x, y) => 1 / (1 + 16 * (x*x + y*y))
+};
+
+
 // --- RBF Interpolator ---
 class RBFInterpolator {
     constructor(xData, yData, epsilon, kernelName) {
@@ -55,6 +60,51 @@ class RBFInterpolator {
     }
 }
 
+
+// --- RBF Interpolator2D ---
+class RBFInterpolator2D {
+    constructor(points, values, epsilon, kernelName) {
+        this.points = points;   // [{x, y}, ...]
+        this.values = values;   // [f(x,y), ...]
+        this.epsilon = epsilon;
+        this.kernel = Kernels[kernelName];
+        this.weights = this.computeWeights();
+    }
+
+    computeWeights() {
+        const n = this.points.length;
+        let A = [];
+
+        for (let i = 0; i < n; i++) {
+            let row = [];
+            for (let j = 0; j < n; j++) {
+                const dx = this.points[i].x - this.points[j].x;
+                const dy = this.points[i].y - this.points[j].y;
+                const r = Math.sqrt(dx*dx + dy*dy);
+                row.push(this.kernel(r, this.epsilon));
+            }
+            A.push(row);
+        }
+
+        const yMatrix = this.values.map(v => [v]);
+        const weightsMatrix = math.lusolve(A, yMatrix);
+
+        return weightsMatrix.map(row => row[0]);
+    }
+
+    predict(x, y) {
+        let total = 0;
+        for (let j = 0; j < this.points.length; j++) {
+            const dx = x - this.points[j].x;
+            const dy = y - this.points[j].y;
+            const r = Math.sqrt(dx*dx + dy*dy);
+            total += this.weights[j] * this.kernel(r, this.epsilon);
+        }
+        return total;
+    }
+}
+
+
 // --- Generate Nodes ---
 function generateNodes(numNodes) {
     const funcName = document.getElementById("test-function").value;
@@ -76,6 +126,26 @@ function generateNodes(numNodes) {
 }
 
 
+// --- Generate Nodes2D ---
+function generateNodes2D(numNodes) {
+    const f = TestFunctions2D["Runge2D"];
+
+    // Use a square grid: numNodes ≈ gridN^2
+    const gridN = Math.max(7, Math.floor(Math.sqrt(numNodes)));
+    let pts = [];
+    let vals = [];
+
+    for (let i = 0; i < gridN; i++) {
+        for (let j = 0; j < gridN; j++) {
+            const x = -1 + 2 * (i / (gridN - 1));
+            const y = -1 + 2 * (j / (gridN - 1));
+            pts.push({ x, y });
+            vals.push(f(x, y));
+        }
+    }
+
+    return { pts, vals, gridN };
+}
 
 // --- Compute Infinity Norm Error ---
 function computeInfinityNorm(yDense, yTrue) {
@@ -86,6 +156,19 @@ function computeInfinityNorm(yDense, yTrue) {
     }
     return infError;
 }
+
+// --- Compute Infinity Norm Error 2D ---
+function computeInfinityNorm2D(zInterp, zTrue) {
+    let maxErr = 0;
+    for (let i = 0; i < zInterp.length; i++) {
+        for (let j = 0; j < zInterp[0].length; j++) {
+            const err = Math.abs(zInterp[i][j] - zTrue[i][j]);
+            if (err > maxErr) maxErr = err;
+        }
+    }
+    return maxErr;
+}
+
 
 // --- Main Update Function ---
 function updatePlot() {
@@ -147,7 +230,7 @@ function updatePlot() {
                 line: { color: "red", dash: "dot", width: 3 }
             }
         ], {
-            title: `Kernel: ${kernel} | ε = ${epsilon}`,
+            title: `Kernel: ${kernel} (ε = ${epsilon})`,
             xaxis: { title: "x" },
             yaxis: { title: "y" },
             height: 500
@@ -161,6 +244,104 @@ function updatePlot() {
         document.getElementById("error-display").innerText = "";
     }
 }
+
+// --- Main Update Function 2D ---
+function updatePlot2D(forceEpsilon = null) {
+    const kernel = document.getElementById("kernel").value;
+    let epsilon = forceEpsilon ?? parseFloat(document.getElementById("epsilon").value);
+    let nodesCount = parseInt(document.getElementById("nodes").value);
+
+    if (nodesCount < 9) {
+        nodesCount = 9;
+        document.getElementById("nodes").value = 9;
+    }
+
+    const { pts, vals } = generateNodes2D(nodesCount);
+    const f2d = TestFunctions2D["Runge2D"];
+
+    try {
+        const rbf2d = new RBFInterpolator2D(pts, vals, epsilon, kernel);
+
+        const N = 50;
+        let xGrid = [];
+        let yGrid = [];
+        let zTrue = [];
+        let zInterp = [];
+
+        for (let i = 0; i < N; i++) {
+            const x = -1 + 2 * (i / (N - 1));
+            xGrid.push(x);
+
+            let trueRow = [];
+            let interpRow = [];
+
+            for (let j = 0; j < N; j++) {
+                const y = -1 + 2 * (j / (N - 1));
+                if (i === 0) yGrid.push(y);
+
+                trueRow.push(f2d(x, y));
+                interpRow.push(rbf2d.predict(x, y));
+            }
+
+            zTrue.push(trueRow);
+            zInterp.push(interpRow);
+        }
+
+        Plotly.purge("plot-area");
+
+        Plotly.newPlot("plot-area", [
+            {
+                x: xGrid,
+                y: yGrid,
+                z: zTrue,
+                type: "surface",
+                colorscale: "Viridis",
+                showscale: false,
+                name: "True Function",
+                scene: "scene"
+            },
+            {
+                x: xGrid,
+                y: yGrid,
+                z: zInterp,
+                type: "surface",
+                colorscale: "Spectral",
+                showscale: false,
+                name: "Interpolant",
+                scene: "scene2"
+            }
+        ], {
+            title: "True vs Interpolated Surface",
+            height: 500,
+
+            grid: { rows: 1, columns: 2 },
+
+            scene: {
+                domain: { x: [0, 0.45], y: [0, 1] },
+                xaxis: { title: "x" },
+                yaxis: { title: "y" },
+                zaxis: { title: "True z" }
+            },
+
+            scene2: {
+                domain: { x: [0.55, 1], y: [0, 1] },
+                xaxis: { title: "x" },
+                yaxis: { title: "y" },
+                zaxis: { title: "Interpolated z" }
+            }
+        });
+
+        document.getElementById("error-display").innerText = "—";
+
+    } catch (err) {
+        document.getElementById("error-display").innerText = "";
+        Plotly.purge("plot-area");
+        document.getElementById("plot-area").innerHTML =
+            "<div style='font-size:1.1rem; color:#b00;'>2D interpolation failed (likely singular matrix). Try a different ε or fewer nodes.</div>";
+    }
+}
+
+
 
 // --- Best Epsilon Animation ---
 async function findBestEpsilon() {
@@ -226,7 +407,7 @@ async function findBestEpsilon() {
                     line: { color: "red", dash: "dot", width: 3 }
                 }
             ], {
-                title: `Kernel: ${kernel} | ε = ${epsilon.toFixed(2)}`,
+                title: `Kernel: ${kernel}  (ε = ${epsilon.toFixed(2)})`,
                 xaxis: { title: "x" },
                 yaxis: { title: "y" },
                 height: 500
@@ -299,7 +480,7 @@ async function findBestEpsilon() {
             line: { color: "red", dash: "dot", width: 3 }
         }
     ], {
-        title: `Kernel: ${kernelFinal} | ideal ε = ${bestEpsilon.toFixed(2)}`,
+        title: `Kernel: ${kernelFinal} (ideal ε = ${bestEpsilon.toFixed(2)})`,
         xaxis: { title: "x" },
         yaxis: { title: "y" },
         height: 500
@@ -309,41 +490,160 @@ async function findBestEpsilon() {
 
 }
 
+// --- Best Epsilon Animation 2D ---
+async function findBestEpsilon2D() {
+    const kernel = document.getElementById("kernel").value;
+    let nodesCount = parseInt(document.getElementById("nodes").value);
+    let bestEpsilon = 0.1;
+    let bestError = Infinity;
+
+    const { pts, vals } = generateNodes2D(nodesCount);
+    const f2d = TestFunctions2D["Runge2D"];
+
+    const delay = 10;
+    const step = 0.05;
+
+    // Dense grid for error evaluation
+    const N = 40;
+    let xGrid = [];
+    let yGrid = [];
+    let zTrue = [];
+
+    for (let i = 0; i < N; i++) {
+        const x = -1 + 2 * (i / (N - 1));
+        xGrid.push(x);
+        let row = [];
+        for (let j = 0; j < N; j++) {
+            const y = -1 + 2 * (j / (N - 1));
+            if (i === 0) yGrid.push(y);
+            row.push(f2d(x, y));
+        }
+        zTrue.push(row);
+    }
+
+    for (let epsilon = 0.1; epsilon <= 10; epsilon += step) {
+        try {
+            const rbf2d = new RBFInterpolator2D(pts, vals, epsilon, kernel);
+
+            let zInterp = [];
+            for (let i = 0; i < N; i++) {
+                let row = [];
+                for (let j = 0; j < N; j++) {
+                    row.push(rbf2d.predict(xGrid[i], yGrid[j]));
+                }
+                zInterp.push(row);
+            }
+
+            const infError = computeInfinityNorm2D(zInterp, zTrue);
+
+            // Live error update
+            document.getElementById("error-display").innerText =
+                infError.toFixed(10);
+
+            // Update slider visually
+            document.getElementById("epsilon").value = epsilon.toFixed(2);
+
+            // Live plot update
+            Plotly.react("plot-area", [{
+                x: xGrid,
+                y: yGrid,
+                z: zInterp,
+                type: "surface",
+                colorscale: "Spectral",
+                showscale: false
+            }], {
+                title: `2D RBF | Kernel: ${kernel} (ε = ${epsilon.toFixed(2)})`,
+                height: 500,
+                scene: {
+                    xaxis: { title: "x" },
+                    yaxis: { title: "y" },
+                    zaxis: { title: "z" }
+                }
+            });
+
+
+
+            if (infError < bestError) {
+                bestError = infError;
+                bestEpsilon = epsilon;
+            }
+
+        } catch (err) {
+            // Skip singular matrices
+        }
+
+        await new Promise(r => setTimeout(r, delay));
+    }
+
+    // Set slider to best ε
+    document.getElementById("epsilon").value = bestEpsilon.toFixed(2);
+
+    // Final plot
+    updatePlot2D(bestEpsilon);
+}
+
+
 // --- Live Event Listeners ---
-document.getElementById("test-function").addEventListener("change", updatePlot);
-document.getElementById("kernel").addEventListener("change", updatePlot);
-document.getElementById("epsilon").addEventListener("input", updatePlot);
-document.getElementById("nodes").addEventListener("change", updatePlot);
-document.getElementById("best-epsilon-btn").addEventListener("click", findBestEpsilon);
+function handleUpdate() {
+    const is2D = document.getElementById("dimension-toggle").checked;
+    if (is2D) {
+        updatePlot2D();
+    } else {
+        updatePlot();
+    }
+}
+
+document.getElementById("kernel").addEventListener("change", handleUpdate);
+document.getElementById("epsilon").addEventListener("input", handleUpdate);
+document.getElementById("nodes").addEventListener("change", handleUpdate);
+document.getElementById("test-function").addEventListener("change", handleUpdate);
+document.getElementById("best-epsilon-btn").addEventListener("click", () => {
+    const is2D = document.getElementById("dimension-toggle").checked;
+    if (is2D) {
+        findBestEpsilon2D();
+    } else {
+        findBestEpsilon();
+    }
+});
+
+const functionSelect = document.getElementById("test-function");
 
 document.getElementById("dimension-toggle").addEventListener("change", () => {
     const is2D = document.getElementById("dimension-toggle").checked;
 
     if (!is2D) {
-        // Re-enable 1D controls
+        // Back to 1D mode
         document.getElementById("kernel").disabled = false;
         document.getElementById("epsilon").disabled = false;
         document.getElementById("nodes").disabled = false;
         document.getElementById("test-function").disabled = false;
         document.getElementById("best-epsilon-btn").disabled = false;
 
+        functionSelect.disabled = false;
+        functionSelect.innerHTML = `
+            <option value="Runge">Runge (1/(1+16x²))</option>
+            <option value="Sine">sin(3x)</option>
+            <option value="Abs">|x|</option>
+            <option value="Poly">1.5x⁹ − 4x⁷ − x³ − x² + 8x</option>
+        `;
+
         updatePlot();
         return;
     }
-    // Disable 1D controls
-    document.getElementById("kernel").disabled = true;
-    document.getElementById("epsilon").disabled = true;
-    document.getElementById("nodes").disabled = true;
+
+    // Switch to 2D mode
+    document.getElementById("kernel").disabled = false;
+    document.getElementById("epsilon").disabled = false;
+    document.getElementById("nodes").disabled = false;
     document.getElementById("test-function").disabled = true;
-    document.getElementById("best-epsilon-btn").disabled = true;
+    document.getElementById("best-epsilon-btn").disabled = false;   // <-- FIXED
 
-    // Replace plot with placeholder
-    Plotly.purge("plot-area");
-    document.getElementById("plot-area").innerHTML =
-        "<div style='font-size:1.4rem; color:#444;'>2D interpolation coming soon...</div>";
+    functionSelect.disabled = true;
+    functionSelect.innerHTML = `
+        <option value="Runge2D">Runge 2D (1/(1+16(x²+y²)))</option>
+    `;
 
-    // Clear error display
-    document.getElementById("error-display").innerText = "";
+    updatePlot2D();
 });
 
 
