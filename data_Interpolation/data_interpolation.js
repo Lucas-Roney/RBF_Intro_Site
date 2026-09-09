@@ -49,14 +49,9 @@ async function loadCSV() {
         const zipped = dates.map((d, i) => ({ d, level: levels[i] }));
         zipped.sort((a, b) => a.d - b.d);
 
-        // Downsample (optional)
-        const downsampled = [];
-        for (let i = 0; i < zipped.length; i += 2) {
-            downsampled.push(zipped[i]);
-        }
+        rawDates = zipped.map(z => z.d);
+        rawLevels = zipped.map(z => z.level);
 
-        rawDates = downsampled.map(z => z.d);
-        rawLevels = downsampled.map(z => z.level);
 
         firstTimestamp = rawDates[0];
         rawTimes = rawDates.map(d => (d - firstTimestamp) / 60000);
@@ -208,7 +203,7 @@ async function findBestEpsilon() {
 
     // Epsilon sweep
     const epsilons = [];
-    for (let e = 0.1; e <= 10; e += 0.05) epsilons.push(e);
+    for (let e = 0.01; e <= 3; e += 0.01) epsilons.push(e);
 
     let bestE = null;
     let bestErr = Infinity;
@@ -273,33 +268,39 @@ document.getElementById("cut-time-btn").addEventListener("click", () => {
         return;
     }
 
-    const tStart = document.getElementById("cut-time-start").value;
-    if (!tStart) {
-        alert("Enter a start time");
+    // Read values directly from your HTML inputs
+    const startStr = document.getElementById("cut-time-start").value;
+    const endStr   = document.getElementById("cut-time-end").value;
+
+    if (!startStr || !endStr) {
+        alert("Enter both start and end times.");
         return;
     }
 
-    let startDate = new Date(tStart.replace(" ", "T"));
-    if (isNaN(startDate.getTime())) {
+    const startDate = new Date(startStr.replace(" ", "T"));
+    const endDate   = new Date(endStr.replace(" ", "T"));
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         alert("Invalid format: YYYY-MM-DD HH:MM");
         return;
     }
 
-    // Define 1-week cut region
-    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
-    const endDate = new Date(startDate.getTime() + oneWeekMs);
+    if (endDate <= startDate) {
+        alert("End time must be after start time.");
+        return;
+    }
 
-    // Mark cutMask for exactly 1 week
+    // Mark cutMask for exactly the chosen region
     cutMask = rawDates.map(d => (d >= startDate && d <= endDate));
 
     console.log("Cut region:", startDate, "to", endDate);
+    console.log("Points cut:", cutMask.filter(x => x).length);
 
-    // Show the cut region visually
     plotRawData();
-
-    // Now interpolate over the cut region
     interpolate();
 });
+
+
 
 
 // =========================
@@ -383,6 +384,7 @@ function interpolate() {
             cutEndDate = rawDates[i];
         }
     }
+
 
     if (!cutStartDate || !cutEndDate) {
         console.log("No cut region defined.");
