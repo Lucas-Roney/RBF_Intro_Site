@@ -31,6 +31,27 @@
     <div id="sidebar">
         <h2>Controls</h2>
 
+        <div class="dimension-toggle-row">
+            <span class="dim-label">1D</span>
+
+            <label class="switch">
+                <input type="checkbox" id="dimension-toggle">
+                <span class="slider"></span>
+            </label>
+
+            <span class="dim-label">2D</span>
+        </div>
+
+
+        <label for="test-function">Function</label>
+        <select id="test-function">
+            <option value="Runge">Runge (1 / (1 + 16x²))</option>
+            <option value="Sine">sin(3x)</option>
+            <option value="Abs">|x|</option>
+            <option value="Poly">1.5x⁹ − 4x⁷ − x³ − x² + 8x</option>
+        </select>
+
+
         <label for="kernel">Kernel</label>
         <select id="kernel">
             <option value="GA">Gaussian (GA)</option>
@@ -66,7 +87,7 @@
 </div>
 
 <footer>
-    RBF Demo — **names go here**
+    RBF Playground — Roney, Blazejewski, Palmer
 </footer>
 
 </body>
