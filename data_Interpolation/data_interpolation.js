@@ -108,7 +108,7 @@ function plotRawData() {
                 y0: 0,
                 y1: 1,
                 yref: "paper",
-                line: { color: "red", width: 2, dash: "dot" }
+                line: { color: "black", width: 2, dash: "dashdot" }
             },
             {
                 type: "line",
@@ -117,24 +117,32 @@ function plotRawData() {
                 y0: 0,
                 y1: 1,
                 yref: "paper",
-                line: { color: "red", width: 2, dash: "dot" }
+                line: { color: "black", width: 2, dash: "dashdot" }
             }
         );
     }
 
     Plotly.newPlot("plot-area", [
         {
-            x: keptDates,
-            y: keptLevels,
+            x: rawDates,
+            y: rawLevels,
             mode: "lines",
-            name: "Tidal Data",
-            line: { color: "blue", width: 2 },
+            name: "Kept Data",
+            line: { color: "rgba(0,0,255,0.5)", width: 2 },
+            connectgaps: false
+        },
+        {
+            x: rawDates,
+            y: rawLevels,
+            mode: "markers",
+            name: "Data Points",
             marker: {
-                size: 6,
-                color: "white",
-                line: { color: "blue", width: 2 }
+                size: 5,
+                color: "blue",
+                opacity: 0.8
             }
         }
+
     ], {
         title: "Tidal Data (Downsampled)",
         xaxis: { title: "Date & Time" },
@@ -151,7 +159,38 @@ function plotRawData() {
 async function findBestEpsilon() {
     if (!csvLoaded) return;
 
-    // Must already have a cut region
+    // -----------------------------
+    // Determine cut boundaries
+    // -----------------------------
+    let cutStartDate = null;
+    let cutEndDate = null;
+
+    for (let i = 0; i < cutMask.length; i++) {
+        if (cutMask[i]) {
+            if (cutStartDate === null) cutStartDate = rawDates[i];
+            cutEndDate = rawDates[i];
+        }
+    }
+
+    if (!cutStartDate || !cutEndDate) {
+        alert("No cut region defined.");
+        return;
+    }
+
+    // -----------------------------
+    // Abort if gap > 1 week
+    // -----------------------------
+    const gapMs = cutEndDate - cutStartDate;
+    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+
+    if (gapMs > oneWeekMs) {
+        alert("Best epsilon search disabled for gaps larger than 1 week.");
+        return;
+    }
+
+    // -----------------------------
+    // Extract cut nodes
+    // -----------------------------
     const cutNodes = rawTimes
         .map((t, i) => ({
             t,
@@ -166,20 +205,13 @@ async function findBestEpsilon() {
         return;
     }
 
-    // Downsample real cut nodes
+    // Downsample cut nodes
     const stride = 5;
     const downsampledCut = cutNodes.filter((_, i) => i % stride === 0);
 
-    // Find boundaries
-    let cutStartDate = null;
-    let cutEndDate = null;
-    for (let i = 0; i < cutMask.length; i++) {
-        if (cutMask[i]) {
-            if (cutStartDate === null) cutStartDate = rawDates[i];
-            cutEndDate = rawDates[i];
-        }
-    }
-
+    // -----------------------------
+    // Boundary endpoints
+    // -----------------------------
     const leftBoundary = rawTimes
         .map((t, i) => ({ t, level: rawLevels[i], date: rawDates[i] }))
         .filter(p => p.date < cutStartDate)
@@ -188,6 +220,11 @@ async function findBestEpsilon() {
     const rightBoundary = rawTimes
         .map((t, i) => ({ t, level: rawLevels[i], date: rawDates[i] }))
         .filter(p => p.date > cutEndDate)[0];
+
+    if (!leftBoundary || !rightBoundary) {
+        alert("Missing boundary points");
+        return;
+    }
 
     const trainTimes = [
         leftBoundary.t,
@@ -201,16 +238,23 @@ async function findBestEpsilon() {
         rightBoundary.level
     ];
 
+    // -----------------------------
     // Epsilon sweep
+    // -----------------------------
     const epsilons = [];
-    for (let e = 0.01; e <= 3; e += 0.01) epsilons.push(e);
+    for (let e = 0.01; e <= 0.75; e += 0.01) epsilons.push(e);
 
     let bestE = null;
     let bestErr = Infinity;
 
     for (const e of epsilons) {
         try {
-            const rbf = new RBFInterpolator(trainTimes, trainLevels, e, document.getElementById("kernel").value);
+            const rbf = new RBFInterpolator(
+                trainTimes,
+                trainLevels,
+                e,
+                document.getElementById("kernel").value
+            );
 
             // Compute error at raw cut nodes
             let err = 0;
@@ -221,26 +265,26 @@ async function findBestEpsilon() {
             }
             const avgErr = err / cutNodes.length;
 
-            // LIVE ERROR UPDATE
-            try {
-                document.getElementById("error-display").innerText = `${avgErr.toFixed(10)}`;
-            } catch (err) {
-                document.getElementById("error-display").innerText = "";
-            }
-
-            // LIVE EPSILON UPDATE
+            // Live updates
+            document.getElementById("error-display").innerText = `${avgErr.toFixed(10)}`;
             document.getElementById("epsilon").value = e.toFixed(2);
 
-            // LIVE PLOT UPDATE
+            // Update plot
             await interpolate();
 
-            // Track best epsilon
+            // ⭐ Zoom into cut region during sweep
+            Plotly.relayout("plot-area", {
+                "xaxis.range": [
+                    new Date(cutStartDate.getTime() - 6 * 60 * 60 * 1000), // 6h before
+                    new Date(cutEndDate.getTime() + 6 * 60 * 60 * 1000)    // 6h after
+                ]
+            });
+
             if (avgErr < bestErr) {
                 bestErr = avgErr;
                 bestE = e;
             }
 
-            // Allow browser to repaint
             await new Promise(r => setTimeout(r, 10));
 
         } catch {
@@ -248,13 +292,23 @@ async function findBestEpsilon() {
         }
     }
 
+    // -----------------------------
     // Final best epsilon
+    // -----------------------------
     document.getElementById("epsilon").value = bestE.toFixed(2);
     document.getElementById("error-display").innerText = `${bestErr.toFixed(10)}`;
 
-    // Final interpolation
     interpolate();
+
+    // ⭐ Final zoom after best epsilon found
+    Plotly.relayout("plot-area", {
+        "xaxis.range": [
+            new Date(cutStartDate.getTime() - 6 * 60 * 60 * 1000),
+            new Date(cutEndDate.getTime() + 6 * 60 * 60 * 1000)
+        ]
+    });
 }
+
 
 
 
@@ -497,7 +551,7 @@ function interpolate() {
             y0: 0,
             y1: 1,
             yref: "paper",
-            line: { color: "red", width: 2, dash: "dot" }
+            line: { color: "black", width: 2, dash: "dashdot" }
         },
         {
             type: "line",
@@ -506,7 +560,7 @@ function interpolate() {
             y0: 0,
             y1: 1,
             yref: "paper",
-            line: { color: "red", width: 2, dash: "dot" }
+            line: { color: "black", width: 2, dash: "dashdot" }
         }
     ];
 
@@ -520,9 +574,22 @@ function interpolate() {
         autosize: false,
         width: 1058,
         height: 500,
-        line: { color: "blue", width: 2 },
+        line: { color: "rgba(0,0,255,0.5)", width: 2 },
         connectgaps: false
     },
+
+    {
+        x: rawDates.map((d, i) => cutMask[i] ? null : d),
+        y: rawLevels.map((lvl, i) => cutMask[i] ? null : lvl),
+        mode: "markers",
+        name: "Data Points",
+        marker: {
+            size: 5,
+            color: "blue",
+            opacity: 0.8
+        }
+    },
+
 
     // 2. Interpolation (dotted red)
     {
@@ -534,6 +601,18 @@ function interpolate() {
         mode: "lines",
         name: "Interpolation",
         line: { color: "red", width: 2, dash: "dot" }
+    },
+
+    // Red markers only at actual cut data (downsampled)
+    {
+        x: downsampledCut.map(p => p.date),
+        y: downsampledCut.map(p => p.level),
+        mode: "markers",
+        name: "Cut Sample Points",
+        marker: {
+            size: 5,
+            color: "red"
+        }
     },
 
 
@@ -549,10 +628,13 @@ function interpolate() {
         line: { color: "rgba(0, 0, 255, 0.3)", width: 2 }
     }
 
+
+
 ], {
     title: `Kernel: ${kernel} (ε = ${epsilon})`,
     xaxis: { title: "Date & Time" },
     yaxis: { title: "Water Level (m)" },
+    width: 1058,
     height: 500,
     shapes: shapes
 });
@@ -579,7 +661,32 @@ try {
 // LISTENERS
 // =========================
 
-document.getElementById("epsilon").addEventListener("input", interpolate);
+document.getElementById("epsilon").addEventListener("input", () => {
+    interpolate();
+
+    // Determine cut boundaries
+    let cutStartDate = null;
+    let cutEndDate = null;
+
+    for (let i = 0; i < cutMask.length; i++) {
+        if (cutMask[i]) {
+            if (cutStartDate === null) cutStartDate = rawDates[i];
+            cutEndDate = rawDates[i];
+        }
+    }
+
+    // If no cut region, do nothing
+    if (!cutStartDate || !cutEndDate) return;
+
+    // Zoom into cut region with a 6-hour buffer
+    Plotly.relayout("plot-area", {
+        "xaxis.range": [
+            new Date(cutStartDate.getTime() - 6 * 60 * 60 * 1000),
+            new Date(cutEndDate.getTime() + 6 * 60 * 60 * 1000)
+        ]
+    });
+});
+
 document.getElementById("kernel").addEventListener("change", interpolate);
 document.getElementById("show-raw-btn").addEventListener("click", showRawData);
 document.getElementById("best-epsilon-btn").addEventListener("click", findBestEpsilon);
