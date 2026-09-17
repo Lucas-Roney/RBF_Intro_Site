@@ -228,7 +228,7 @@ function plotRawData() {
             }
         }
     ], {
-        title: "Tidal Data",
+        title: "<b>Tidal Data</b>",
         xaxis: { title: "Date & Time" },
         yaxis: { title: "Water Level (m)" },
         autosize: false,
@@ -434,8 +434,6 @@ function interpolate(quiet = false) {
         return;
     }
 
-    const downsampledCut = cutNodes.filter((_, i) => i % currentStride === 0);
-
     const leftBoundary = rawTimes
         .map((t, i) => ({ t, level: rawLevels[i], date: rawDates[i] }))
         .filter(p => p.date < cutStartDate)
@@ -450,10 +448,21 @@ function interpolate(quiet = false) {
         return;
     }
 
+    // Filter interior downsampled nodes strictly within boundary timestamps
+    const downsampledCut = cutNodes
+        .filter((_, i) => i % currentStride === 0)
+        .filter(p => p.t > leftBoundary.t && p.t < rightBoundary.t);
+
     const trainTimes = [
         leftBoundary.t,
         ...downsampledCut.map(p => p.t),
         rightBoundary.t
+    ];
+
+    const trainDates = [
+        leftBoundary.date,
+        ...downsampledCut.map(p => p.date),
+        rightBoundary.date
     ];
 
     const trainLevels = [
@@ -505,9 +514,10 @@ function interpolate(quiet = false) {
         }
     ];
 
+    const totalNodes = trainTimes.length;
     const chartTitle = (method === "Poly") 
-        ? `Method: Lagrange Polynomial (${trainTimes.length} nodes)` 
-        : `Kernel: ${kernel} (ε = ${epsilon.toFixed(3)})`;
+        ? `<b>Method: Lagrange Polynomial (${totalNodes} nodes)</b>` 
+        : `<b>RBF  (MQ ,  ε = ${epsilon.toFixed(3)})</b>`;
 
     Plotly.react("plot-area", [
         {
@@ -533,11 +543,11 @@ function interpolate(quiet = false) {
             line: { color: "red", width: 2, dash: "dot" }
         },
         {
-            x: downsampledCut.map(p => p.date),
-            y: downsampledCut.map(p => p.level),
+            x: trainDates,
+            y: trainLevels,
             mode: "markers",
-            name: "Cut Sample Points",
-            marker: { size: 5, color: "red" }
+            name: "Active Nodes",
+            marker: { size: 6, color: "red" }
         },
         {
             x: cutNodes.map(p => p.date),
@@ -555,16 +565,15 @@ function interpolate(quiet = false) {
         shapes: shapes
     });
 
-    let err = 0;
+    // Infinity Norm Error (Maximum Absolute Error)
+    let maxErr = 0;
     for (let i = 0; i < cutNodes.length; i++) {
-        const real = cutNodes[i].level;
-        const pred = interpLevels[i];
-        err += Math.abs(real - pred);
+        const pointErr = Math.abs(cutNodes[i].level - interpLevels[i]);
+        if (pointErr > maxErr) maxErr = pointErr;
     }
-    const avgErr = err / cutNodes.length;
 
     try {
-        document.getElementById("error-display").innerText = `${avgErr.toFixed(10)}`;
+        document.getElementById("error-display").innerText = `${maxErr.toFixed(6)}`;
     } catch {
         document.getElementById("error-display").innerText = "";
     }
@@ -629,13 +638,19 @@ async function findBestNodes() {
         return;
     }
 
-    const maxStride = Math.min(30, Math.floor(cutNodes.length / 2));
+    const minTargetNodes = 5;
+    const maxStride = Math.floor(cutNodes.length / minTargetNodes);
     let bestStride = currentStride;
     let bestErr = Infinity;
 
     for (let s = 2; s <= maxStride; s++) {
         try {
-            const downsampledCut = cutNodes.filter((_, i) => i % s === 0);
+            // Strictly enforce boundary bounds (leftBoundary.t < t < rightBoundary.t)
+            const downsampledCut = cutNodes
+                .filter((_, i) => i % s === 0)
+                .filter(p => p.t > leftBoundary.t && p.t < rightBoundary.t);
+
+            if (downsampledCut.length < 2) break;
 
             const trainTimes = [
                 leftBoundary.t,
@@ -651,13 +666,17 @@ async function findBestNodes() {
 
             const interp = new LagrangeInterpolator(trainTimes, trainLevels);
 
-            let err = 0;
+            // Calculate Infinity Norm Error (maximum point error)
+            let maxErr = 0;
             for (let i = 0; i < cutNodes.length; i++) {
                 const real = cutNodes[i].level;
                 const pred = interp.predict(cutNodes[i].t);
-                err += Math.abs(real - pred);
+                const pointErr = Math.abs(real - pred);
+                
+                if (pointErr > maxErr) {
+                    maxErr = pointErr;
+                }
             }
-            const avgErr = err / cutNodes.length;
 
             currentStride = s;
             await interpolate(true);
@@ -669,12 +688,12 @@ async function findBestNodes() {
                 ]
             });
 
-            if (avgErr < bestErr) {
-                bestErr = avgErr;
+            if (maxErr < bestErr) {
+                bestErr = maxErr;
                 bestStride = s;
             }
 
-            await new Promise(r => setTimeout(r, 15));
+            await new Promise(r => setTimeout(r, 75));
 
         } catch {
             // Skip ill-conditioned node sets
@@ -682,7 +701,7 @@ async function findBestNodes() {
     }
 
     currentStride = bestStride;
-    interpolate();
+    await interpolate();
 
     Plotly.relayout("plot-area", {
         "xaxis.range": [
@@ -733,14 +752,26 @@ async function findBestEpsilon() {
     }
 
     // Determine search boundaries and step size based on chosen dataset
-    const choice = document.getElementById("csv-select").value;
-    const isWilmington = choice.toLowerCase().includes("wilmington");
+    const choice = document.getElementById("csv-select").value.toLowerCase();
 
-    const maxE = isWilmington ? 0.3 : 1.0;
-    const stepE = isWilmington ? 0.01 : 0.005;
+    let startE, maxE, stepE;
+
+    if (choice.includes("wilmington")) {
+        startE = 0.01;
+        maxE = 0.1;
+        stepE = 0.005;
+    } else if (choice.includes("rhode")) {
+        startE = 0.05;
+        maxE = 0.195;
+        stepE = 0.001;
+    } else { // Handles live / NOAA / default
+        startE = 0.1;
+        maxE = 5.0;
+        stepE = 0.1;
+    }
 
     const epsilons = [];
-    for (let e = 0.01; e <= maxE + 1e-9; e += stepE) {
+    for (let e = startE; e <= maxE + 1e-9; e += stepE) {
         epsilons.push(e);
     }
 
