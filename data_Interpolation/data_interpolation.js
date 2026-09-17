@@ -11,6 +11,38 @@ let currentStride = 5; // Global downsampling stride for cut sections
 
 
 // =========================
+// UI LOCK / UNLOCK HELPER
+// =========================
+function toggleUIControls(disabled) {
+    const controlIds = [
+        "Method",
+        "epsilon",
+        "kernel",
+        "best-epsilon-btn",
+        "cut-time-btn",
+        "cut-time-start",
+        "cut-time-end",
+        "show-raw-btn",
+        "csv-select"
+    ];
+
+    const isPoly = document.getElementById("Method")?.value === "Poly";
+
+    controlIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        // Keep epsilon and kernel disabled if in Poly mode when unlocking
+        if (!disabled && (id === "epsilon" || id === "kernel") && isPoly) {
+            el.disabled = true;
+        } else {
+            el.disabled = disabled;
+        }
+    });
+}
+
+
+// =========================
 // LOAD & DOWNSAMPLE CSV
 // =========================
 async function loadCSV(filename) {
@@ -584,11 +616,16 @@ function interpolate(quiet = false) {
 // OPTIMIZATION SEARCH ROUTED BY METHOD
 // =========================
 async function handleOptimizationClick() {
-    const method = document.getElementById("Method").value;
-    if (method === "Poly") {
-        await findBestNodes();
-    } else {
-        await findBestEpsilon();
+    toggleUIControls(true);
+    try {
+        const method = document.getElementById("Method").value;
+        if (method === "Poly") {
+            await findBestNodes();
+        } else {
+            await findBestEpsilon();
+        }
+    } finally {
+        toggleUIControls(false);
     }
 }
 
