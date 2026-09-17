@@ -57,10 +57,11 @@ async function loadCSV(filename) {
 
 async function loadNOAA(stationId = "9411340") {
     try {
-        // Calculate date range: today minus 3 months
+        // NOAA limits 6-minute water level requests to max 31 days.
+        // We fetch 14 days to keep data load light and performant.
         const today = new Date();
-        const threeMonthsAgo = new Date(today);
-        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+        const pastDate = new Date(today);
+        pastDate.setDate(pastDate.getDate() - 14);
 
         const formatDate = (date) => {
             const y = date.getFullYear();
@@ -69,15 +70,23 @@ async function loadNOAA(stationId = "9411340") {
             return `${y}${m}${d}`;
         };
 
-        const begin = formatDate(threeMonthsAgo);
+        const begin = formatDate(pastDate);
         const end = formatDate(today);
 
         const url = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?station=${stationId}&product=water_level&datum=MLLW&units=metric&time_zone=lst_ldt&format=json&begin_date=${begin}&end_date=${end}`;
 
         const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+
         const json = await response.json();
 
-        if (!json.data) throw new Error("NOAA returned no data");
+        if (json.error) {
+            throw new Error(json.error.message || "NOAA API returned an error");
+        }
+
+        if (!json.data || json.data.length === 0) {
+            throw new Error("NOAA returned no data");
+        }
 
         // Reset globals
         rawTimes = [];
@@ -87,8 +96,12 @@ async function loadNOAA(stationId = "9411340") {
         firstTimestamp = null;
 
         json.data.forEach(entry => {
-            const date = new Date(entry.t);
+            // Replace space with T for cross-browser ISO Date parsing compatibility
+            const isoStr = entry.t.includes("T") ? entry.t : entry.t.replace(" ", "T");
+            const date = new Date(isoStr);
             const level = parseFloat(entry.v);
+
+            if (isNaN(date.getTime()) || isNaN(level)) return;
 
             if (!firstTimestamp) firstTimestamp = date;
 
@@ -102,15 +115,37 @@ async function loadNOAA(stationId = "9411340") {
         cutMask = new Array(rawTimes.length).fill(false);
         csvLoaded = true;
 
+        // Update cut input boxes to default to a 1-day slice of the loaded NOAA data
+        autoSetCutInputs();
+
         plotRawData();
 
     } catch (err) {
-        alert("NOAA fetch failed — using local CSV instead.");
+        alert(`NOAA fetch failed: ${err.message}. Falling back to local dataset.`);
         console.error(err);
 
-        // fallback
-        loadCSV("SB_tidal.csv");
+        // Fallback to local dataset present in dropdown
+        const select = document.getElementById("csv-select");
+        select.value = "Wilmington_tidal.csv";
+        loadCSV("Wilmington_tidal.csv");
     }
+}
+
+// Helper to auto-populate input cut dates based on active dataset range
+function autoSetCutInputs() {
+    if (rawDates.length === 0) return;
+
+    const pad = (n) => String(n).padStart(2, '0');
+    const formatInputDate = (d) => 
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+    // Default cut range: 1-day window in the middle of the dataset
+    const midIndex = Math.floor(rawDates.length / 2);
+    const startDate = rawDates[midIndex];
+    const endDate = new Date(startDate.getTime() + 24 * 60 * 60 * 1000);
+
+    document.getElementById("cut-time-start").value = formatInputDate(startDate);
+    document.getElementById("cut-time-end").value = formatInputDate(endDate);
 }
 
 
