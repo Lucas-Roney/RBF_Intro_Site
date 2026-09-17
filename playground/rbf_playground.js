@@ -198,9 +198,9 @@ function updatePlot() {
     let epsilon = parseFloat(document.getElementById("epsilon").value);
     let nodesCount = parseInt(document.getElementById("nodes").value);
 
-    if (nodesCount < 5) {
-        nodesCount = 5;
-        document.getElementById("nodes").value = 5;
+    if (nodesCount < 2) {
+        nodesCount = 2;
+        document.getElementById("nodes").value = 2;
     }
     if (nodesCount > 200) {
         nodesCount = 200;

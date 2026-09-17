@@ -12,54 +12,41 @@ let csvLoaded = false;
 // =========================
 // LOAD & DOWNSAMPLE CSV
 // =========================
-async function loadCSV() {
+async function loadCSV(filename) {
     try {
-        // IMPORTANT: Spaces in filenames must be encoded
-        const safePath = "TidalData.csv";
-
-        const response = await fetch(safePath);
+        const response = await fetch(filename);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const text = await response.text();
-        const lines = text.trim().split("\n").slice(1);
 
-        let dates = [];
-        let levels = [];
+        // Reset globals
+        rawTimes = [];
+        rawLevels = [];
+        rawDates = [];
+        cutMask = [];
+        firstTimestamp = null;
 
-        for (let i = 0; i < lines.length; i++) {
-            const parts = lines[i].split(",");
-            if (parts.length < 2) continue;
+        // Parse CSV
+        const lines = text.trim().split("\n");
+        for (let i = 1; i < lines.length; i++) {
+            const [dateStr, levelStr] = lines[i].split(",");
 
-            // Clean timestamp
-            let ts = parts[0].trim().replace(/^"|"$/g, "");
-            ts = ts.replace(" ", "T");
+            const date = new Date(dateStr);
+            const level = parseFloat(levelStr);
 
-            const timestamp = new Date(ts);
-            const waterLevel = parseFloat(parts[1].trim());
+            if (!firstTimestamp) firstTimestamp = date;
 
-            if (!isNaN(timestamp.getTime()) && !isNaN(waterLevel)) {
-                dates.push(timestamp);
-                levels.push(waterLevel);
-            }
+            rawDates.push(date);
+            rawLevels.push(level);
+
+            // Convert to minutes since first timestamp
+            const t = (date - firstTimestamp) / 60000;
+            rawTimes.push(t);
         }
-
-        if (dates.length === 0) throw new Error("No valid data points");
-
-        // Sort by timestamp
-        const zipped = dates.map((d, i) => ({ d, level: levels[i] }));
-        zipped.sort((a, b) => a.d - b.d);
-
-        rawDates = zipped.map(z => z.d);
-        rawLevels = zipped.map(z => z.level);
-
-
-        firstTimestamp = rawDates[0];
-        rawTimes = rawDates.map(d => (d - firstTimestamp) / 60000);
 
         cutMask = new Array(rawTimes.length).fill(false);
         csvLoaded = true;
 
-        console.log(`Loaded ${rawTimes.length} points`);
         plotRawData();
 
     } catch (error) {
@@ -67,6 +54,65 @@ async function loadCSV() {
         console.error(error);
     }
 }
+
+async function loadNOAA(stationId = "9411340") {
+    try {
+        // Calculate date range: today minus 3 months
+        const today = new Date();
+        const threeMonthsAgo = new Date(today);
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+        const formatDate = (date) => {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}${m}${d}`;
+        };
+
+        const begin = formatDate(threeMonthsAgo);
+        const end = formatDate(today);
+
+        const url = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?station=${stationId}&product=water_level&datum=MLLW&units=metric&time_zone=lst_ldt&format=json&begin_date=${begin}&end_date=${end}`;
+
+        const response = await fetch(url);
+        const json = await response.json();
+
+        if (!json.data) throw new Error("NOAA returned no data");
+
+        // Reset globals
+        rawTimes = [];
+        rawLevels = [];
+        rawDates = [];
+        cutMask = [];
+        firstTimestamp = null;
+
+        json.data.forEach(entry => {
+            const date = new Date(entry.t);
+            const level = parseFloat(entry.v);
+
+            if (!firstTimestamp) firstTimestamp = date;
+
+            rawDates.push(date);
+            rawLevels.push(level);
+
+            const t = (date - firstTimestamp) / 60000;
+            rawTimes.push(t);
+        });
+
+        cutMask = new Array(rawTimes.length).fill(false);
+        csvLoaded = true;
+
+        plotRawData();
+
+    } catch (err) {
+        alert("NOAA fetch failed — using local CSV instead.");
+        console.error(err);
+
+        // fallback
+        loadCSV("SB_tidal.csv");
+    }
+}
+
 
 
 // =========================
@@ -148,9 +194,8 @@ function plotRawData() {
         xaxis: { title: "Date & Time" },
         yaxis: { title: "Water Level (m)" },
         autosize: false,
-        width: 1058,
-        height: 500,
-        height: 500,
+        width: 1080,
+        height: 490,
         shapes: shapes,
         showlegend: true
     });
@@ -361,10 +406,7 @@ document.getElementById("cut-time-btn").addEventListener("click", () => {
 // RBF INTERPOLATOR
 // =========================
 const Kernels = {
-    GA: (r, e) => Math.exp(-((e * r) ** 2)),
-    MQ: (r, e) => Math.sqrt(1 + (e * r) ** 2),
-    IMQ: (r, e) => 1 / Math.sqrt(1 + (e * r) ** 2),
-    IQ: (r, e) => 1 / (1 + (e * r) ** 2)
+    RBF: (r, e) => Math.sqrt(1 + (e * r) ** 2),
 };
 
 class RBFInterpolator {
@@ -572,8 +614,8 @@ function interpolate() {
         mode: "lines",
         name: "Kept Data",
         autosize: false,
-        width: 1058,
-        height: 500,
+        width: 1080,
+        height: 490,
         line: { color: "rgba(0,0,255,0.5)", width: 2 },
         connectgaps: false
     },
@@ -596,8 +638,8 @@ function interpolate() {
         x: denseInterpTimes.map(t => new Date(firstTimestamp.getTime() + t * 60000)),
         y: denseInterpLevels,
         autosize: false,
-        width: 1058,
-        height: 500,
+        width: 1080,
+        height: 490,
         mode: "lines",
         name: "Interpolation",
         line: { color: "red", width: 2, dash: "dot" }
@@ -621,8 +663,8 @@ function interpolate() {
         x: cutNodes.map(p => p.date),
         y: cutNodes.map(p => p.level),
         autosize: false,
-        width: 1058,
-        height: 500,
+        width: 1080,
+        height: 490,
         mode: "lines",
         name: "Cut Data",
         line: { color: "rgba(0, 0, 255, 0.3)", width: 2 }
@@ -634,8 +676,8 @@ function interpolate() {
     title: `Kernel: ${kernel} (ε = ${epsilon})`,
     xaxis: { title: "Date & Time" },
     yaxis: { title: "Water Level (m)" },
-    width: 1058,
-    height: 500,
+    width: 1080,
+    height: 490,
     shapes: shapes
 });
 
@@ -702,8 +744,19 @@ function showRawData() {
     plotRawData();
 }
 
+document.getElementById("csv-select").addEventListener("change", () => {
+    const choice = document.getElementById("csv-select").value;
+
+    if (choice === "noaa-live") {
+        loadNOAA();
+    } else {
+        loadCSV(choice);
+    }
+});
+
+
 
 // =========================
 // LOAD
 // =========================
-loadCSV();
+loadCSV(document.getElementById("csv-select").value);
