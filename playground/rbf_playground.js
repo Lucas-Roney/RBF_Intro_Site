@@ -1,4 +1,29 @@
-// Ctrl + f & .tofixed(10) to adjust error decimal place
+// Help Popup Logic
+const helpBtn = document.getElementById('help-btn');
+const helpPopup = document.getElementById('help-popup');
+const helpOverlay = document.getElementById('help-overlay');
+const helpClose = document.getElementById('help-close-btn');
+
+if (helpBtn) {
+    helpBtn.addEventListener('click', () => {
+        helpOverlay.style.display = "block";
+        helpPopup.style.display = "block";
+    });
+}
+
+if (helpClose) {
+    helpClose.addEventListener('click', () => {
+        helpOverlay.style.display = "none";
+        helpPopup.style.display = "none";
+    });
+}
+
+if (helpOverlay) {
+    helpOverlay.addEventListener('click', () => {
+        helpOverlay.style.display = "none";
+        helpPopup.style.display = "none";
+    });
+}
 
 // --- Kernels (correct ε scaling) ---
 const Kernels = {
@@ -20,6 +45,19 @@ const TestFunctions2D = {
     Runge2D: (x, y) => 1 / (1 + 16 * (x*x + y*y))
 };
 
+// --- Helper: Control Locking ---
+function toggleControls(disabled) {
+    const is2D = document.getElementById("dimension-toggle").checked;
+    const isPoly = document.getElementById("kernel").value === "POLY";
+
+    document.getElementById("kernel").disabled = disabled;
+    document.getElementById("nodes").disabled = disabled;
+    document.getElementById("dimension-toggle").disabled = disabled;
+    document.getElementById("best-epsilon-btn").disabled = disabled;
+
+    document.getElementById("test-function").disabled = disabled || is2D;
+    document.getElementById("epsilon").disabled = disabled || isPoly;
+}
 
 // --- RBF Interpolator ---
 class RBFInterpolator {
@@ -30,7 +68,7 @@ class RBFInterpolator {
         this.kernelName = kernelName;
 
         if (this.kernelName === "POLY") {
-            this.weights = []; // No linear solver needed for Lagrange polynomial
+            this.weights = [];
         } else {
             this.kernel = Kernels[kernelName];
             this.weights = this.computeWeights();
@@ -82,12 +120,11 @@ class RBFInterpolator {
     }
 }
 
-
 // --- RBF Interpolator2D ---
 class RBFInterpolator2D {
     constructor(points, values, epsilon, kernelName) {
-        this.points = points;   // [{x, y}, ...]
-        this.values = values;   // [f(x,y), ...]
+        this.points = points;
+        this.values = values;
         this.epsilon = epsilon;
         this.kernel = Kernels[kernelName];
         this.weights = this.computeWeights();
@@ -126,7 +163,6 @@ class RBFInterpolator2D {
     }
 }
 
-
 // --- Generate Nodes ---
 function generateNodes(numNodes) {
     const funcName = document.getElementById("test-function").value;
@@ -147,12 +183,10 @@ function generateNodes(numNodes) {
     return { xPoints, yPoints, left, right };
 }
 
-
 // --- Generate Nodes2D ---
 function generateNodes2D(numNodes) {
     const f = TestFunctions2D["Runge2D"];
 
-    // Use a square grid: numNodes ≈ gridN^2
     const gridN = Math.max(7, Math.floor(Math.sqrt(numNodes)));
     let pts = [];
     let vals = [];
@@ -169,7 +203,7 @@ function generateNodes2D(numNodes) {
     return { pts, vals, gridN };
 }
 
-// --- Compute Infinity Norm Error ---
+// --- Compute Infinity Norm Errors ---
 function computeInfinityNorm(yDense, yTrue) {
     let infError = 0;
     for (let i = 0; i < yDense.length; i++) {
@@ -179,7 +213,6 @@ function computeInfinityNorm(yDense, yTrue) {
     return infError;
 }
 
-// --- Compute Infinity Norm Error 2D ---
 function computeInfinityNorm2D(zInterp, zTrue) {
     let maxErr = 0;
     for (let i = 0; i < zInterp.length; i++) {
@@ -191,8 +224,7 @@ function computeInfinityNorm2D(zInterp, zTrue) {
     return maxErr;
 }
 
-
-// --- Main Update Function ---
+// --- Main Update Function 1D ---
 function updatePlot() {
     const kernel = document.getElementById("kernel").value;
     let epsilon = parseFloat(document.getElementById("epsilon").value);
@@ -259,8 +291,7 @@ function updatePlot() {
         });
 
         const infError = computeInfinityNorm(yDense, yTrue);
-        document.getElementById("error-display").innerText =
-            `${infError.toFixed(10)}`;
+        document.getElementById("error-display").innerText = `${infError.toFixed(10)}`;
 
     } catch (err) {
         document.getElementById("error-display").innerText = "";
@@ -309,14 +340,11 @@ function updatePlot2D(forceEpsilon = null) {
             zInterp.push(interpRow);
         }
 
-        Plotly.purge("plot-area");
-
-        // Build error surface
         let errSurface = [];
         for (let i = 0; i < N; i++) {
             let row = [];
             for (let j = 0; j < N; j++) {
-                row.push(zInterp[i][j] - zTrue[i][j]);  // signed error
+                row.push(zInterp[i][j] - zTrue[i][j]);
             }
             errSurface.push(row);
         }
@@ -342,8 +370,6 @@ function updatePlot2D(forceEpsilon = null) {
             }
         });
 
-
-
         const infError2D = computeInfinityNorm2D(zInterp, zTrue);
         document.getElementById("error-display").innerText = infError2D.toFixed(10);
 
@@ -355,51 +381,188 @@ function updatePlot2D(forceEpsilon = null) {
     }
 }
 
-
-
 // --- Best Epsilon Animation ---
 async function findBestEpsilon() {
-    const kernel = document.getElementById("kernel").value;
-    let nodesCount = parseInt(document.getElementById("nodes").value);
+    toggleControls(true);
 
-    const { xPoints, yPoints, left, right } = generateNodes(nodesCount);
+    try {
+        const kernel = document.getElementById("kernel").value;
+        let nodesCount = parseInt(document.getElementById("nodes").value);
 
-    let bestEpsilon = 0.2;
-    let bestError = Infinity;
+        const { xPoints, yPoints, left, right } = generateNodes(nodesCount);
 
-    const delay = 8;   // fast animation
-    const step = 0.1;  // finer epsilon resolution
+        let bestEpsilon = 0.2;
+        let bestError = Infinity;
 
-    for (let epsilon = 0.2; epsilon <= 30; epsilon += step) {
+        const delay = 8;
+        const step = 0.1;
 
-        try {
-            const rbf = new RBFInterpolator(xPoints, yPoints, epsilon, kernel);
+        for (let epsilon = 0.2; epsilon <= 30; epsilon += step) {
+            try {
+                const rbf = new RBFInterpolator(xPoints, yPoints, epsilon, kernel);
+
+                let xDense = [];
+                let yDense = [];
+                for (let i = 0; i <= 200; i++) {
+                    const x = left + (right - left) * (i / 200);
+                    xDense.push(x);
+                    yDense.push(rbf.predict(x));
+                }
+
+                const f = TestFunctions[document.getElementById("test-function").value];
+                const yTrue = xDense.map(f);
+                const infError = computeInfinityNorm(yDense, yTrue);
+
+                document.getElementById("error-display").innerText = `${infError.toFixed(10)}`;
+                document.getElementById("epsilon").value = epsilon.toFixed(2);
+
+                Plotly.react("plot-area", [
+                    {
+                        x: xDense,
+                        y: yDense,
+                        mode: "lines",
+                        name: "RBF Interpolation",
+                        line: { color: "black", width: 3 }
+                    },
+                    {
+                        x: xPoints,
+                        y: yPoints,
+                        mode: "markers",
+                        name: "Nodes",
+                        marker: {
+                            color: "white",
+                            size: 10,
+                            line: { color: "black", width: 2 }
+                        }
+                    },
+                    {
+                        x: xDense,
+                        y: yTrue,
+                        mode: "lines",
+                        name: "Runge Function",
+                        line: { color: "red", dash: "dot", width: 3 }
+                    }
+                ], {
+                    title: `Kernel: ${kernel}  (ε = ${epsilon.toFixed(2)})`,
+                    xaxis: { title: "x" },
+                    yaxis: { title: "y" },
+                    height: 500
+                });
+
+                if (infError < bestError) {
+                    bestError = infError;
+                    bestEpsilon = epsilon;
+                }
+
+            } catch (err) {
+                continue;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+
+        document.getElementById("epsilon").value = bestEpsilon.toFixed(2);
+        document.getElementById("plot-area").style.opacity = 0;
+
+        await new Promise(resolve => setTimeout(resolve, 150));
+
+        const kernelFinal = document.getElementById("kernel").value;
+        const { xPoints: xFinal, yPoints: yFinal, left: leftFinal, right: rightFinal } =
+            generateNodes(parseInt(document.getElementById("nodes").value));
+
+        const rbfFinal = new RBFInterpolator(xFinal, yFinal, bestEpsilon, kernelFinal);
+
+        let xDenseFinal = [];
+        let yDenseFinal = [];
+        for (let i = 0; i <= 400; i++) {
+            const x = leftFinal + (rightFinal - leftFinal) * (i / 400);
+            xDenseFinal.push(x);
+            yDenseFinal.push(rbfFinal.predict(x));
+        }
+
+        const fFinal = TestFunctions[document.getElementById("test-function").value];
+        const yTrueFinal = xDenseFinal.map(fFinal);
+
+        const infErrorFinal = computeInfinityNorm(yDenseFinal, yTrueFinal);
+
+        document.getElementById("error-display").innerText = `${infErrorFinal.toFixed(10)}`;
+
+        Plotly.newPlot("plot-area", [
+            {
+                x: xDenseFinal,
+                y: yDenseFinal,
+                mode: "lines",
+                name: "RBF Interpolation",
+                line: { color: "black", width: 3 }
+            },
+            {
+                x: xFinal,
+                y: yFinal,
+                mode: "markers",
+                name: "Nodes",
+                marker: {
+                    color: "white",
+                    size: 10,
+                    line: { color: "black", width: 2 }
+                }
+            },
+            {
+                x: xDenseFinal,
+                y: yTrueFinal,
+                mode: "lines",
+                name: "Runge Function",
+                line: { color: "red", dash: "dot", width: 3 }
+            }
+        ], {
+            title: `Kernel: ${kernelFinal} (ideal ε = ${bestEpsilon.toFixed(2)})`,
+            xaxis: { title: "x" },
+            yaxis: { title: "y" },
+            height: 500
+        });
+
+        document.getElementById("plot-area").style.opacity = 1;
+
+    } finally {
+        toggleControls(false);
+    }
+}
+
+// --- Best Nodes Animation (Polynomial Only) ---
+async function findBestNodesPoly() {
+    toggleControls(true);
+
+    try {
+        const funcName = document.getElementById("test-function").value;
+        const f = TestFunctions[funcName];
+
+        let bestNodes = 5;
+        let bestError = Infinity;
+        const delay = 80;
+
+        for (let nodes = 5; nodes <= 30; nodes++) {
+            const { xPoints, yPoints, left, right } = generateNodes(nodes);
+            const poly = new RBFInterpolator(xPoints, yPoints, 0, "POLY");
 
             let xDense = [];
             let yDense = [];
-            for (let i = 0; i <= 200; i++) {
-                const x = left + (right - left) * (i / 200);
+            for (let i = 0; i <= 400; i++) {
+                const x = left + (right - left) * (i / 400);
                 xDense.push(x);
-                yDense.push(rbf.predict(x));
+                yDense.push(poly.predict(x));
             }
 
-            const f = TestFunctions[document.getElementById("test-function").value];
             const yTrue = xDense.map(f);
             const infError = computeInfinityNorm(yDense, yTrue);
 
-            //  LIVE ERROR UPDATE DURING ANIMATION
-            document.getElementById("error-display").innerText =
-                `${infError.toFixed(10)}`;
-
-            // Update slider visually during animation
-            document.getElementById("epsilon").value = epsilon.toFixed(2);
+            document.getElementById("nodes").value = nodes;
+            document.getElementById("error-display").innerText = infError.toFixed(10);
 
             Plotly.react("plot-area", [
                 {
                     x: xDense,
                     y: yDense,
                     mode: "lines",
-                    name: "RBF Interpolation",
+                    name: "Polynomial Interpolation",
                     line: { color: "black", width: 3 }
                 },
                 {
@@ -417,11 +580,11 @@ async function findBestEpsilon() {
                     x: xDense,
                     y: yTrue,
                     mode: "lines",
-                    name: "Runge Function",
+                    name: "True Function",
                     line: { color: "red", dash: "dot", width: 3 }
                 }
             ], {
-                title: `Kernel: ${kernel}  (ε = ${epsilon.toFixed(2)})`,
+                title: `Polynomial Interpolation (Lagrange) | Nodes: ${nodes}`,
                 xaxis: { title: "x" },
                 yaxis: { title: "y" },
                 height: 500
@@ -429,165 +592,24 @@ async function findBestEpsilon() {
 
             if (infError < bestError) {
                 bestError = infError;
-                bestEpsilon = epsilon;
+                bestNodes = nodes;
             }
 
-        } catch (err) {
-            continue;
+            await new Promise(resolve => setTimeout(resolve, delay));
         }
 
-        await new Promise(resolve => setTimeout(resolve, delay));
-    }
+        document.getElementById("nodes").value = bestNodes;
+        document.getElementById("plot-area").style.opacity = 0;
 
-    document.getElementById("epsilon").value = bestEpsilon.toFixed(2);
+        await new Promise(resolve => setTimeout(resolve, 150));
 
-    // Final plot with "ideal ε"
-    document.getElementById("plot-area").style.opacity = 0;
-    setTimeout(() => {
-    const kernelFinal = document.getElementById("kernel").value;
-    const { xPoints: xFinal, yPoints: yFinal, left, right } =
-        generateNodes(parseInt(document.getElementById("nodes").value));
-
-    const rbfFinal = new RBFInterpolator(xFinal, yFinal, bestEpsilon, kernelFinal);
-
-    // Dense grid
-    let xDenseFinal = [];
-    let yDenseFinal = [];
-    for (let i = 0; i <= 400; i++) {
-        const x = left + (right - left) * (i / 400);
-        xDenseFinal.push(x);
-        yDenseFinal.push(rbfFinal.predict(x));
-    }
-
-    const fFinal = TestFunctions[document.getElementById("test-function").value];
-    const yTrueFinal = xDenseFinal.map(fFinal);
-
-    const infErrorFinal = computeInfinityNorm(yDenseFinal, yTrueFinal);
-
-    document.getElementById("error-display").innerText =
-        `${infErrorFinal.toFixed(10)}`;
-
-    Plotly.newPlot("plot-area", [
-        {
-            x: xDenseFinal,
-            y: yDenseFinal,
-            mode: "lines",
-            name: "RBF Interpolation",
-            line: { color: "black", width: 3 }
-        },
-        {
-            x: xFinal,
-            y: yFinal,
-            mode: "markers",
-            name: "Nodes",
-            marker: {
-                color: "white",
-                size: 10,
-                line: { color: "black", width: 2 }
-            }
-        },
-        {
-            x: xDenseFinal,
-            y: yTrueFinal,
-            mode: "lines",
-            name: "Runge Function",
-            line: { color: "red", dash: "dot", width: 3 }
-        }
-    ], {
-        title: `Kernel: ${kernelFinal} (ideal ε = ${bestEpsilon.toFixed(2)})`,
-        xaxis: { title: "x" },
-        yaxis: { title: "y" },
-        height: 500
-    });
-        document.getElementById("plot-area").style.opacity = 1;
-    }, 150);
-
-}
-
-// --- Best Nodes Animation (Polynomial Only) ---
-async function findBestNodesPoly() {
-    const funcName = document.getElementById("test-function").value;
-    const f = TestFunctions[funcName];
-
-    let bestNodes = 5;
-    let bestError = Infinity;
-    const delay = 80; // Animation frame delay in ms
-
-    for (let nodes = 5; nodes <= 30; nodes++) {
-        const { xPoints, yPoints, left, right } = generateNodes(nodes);
-        const poly = new RBFInterpolator(xPoints, yPoints, 0, "POLY");
-
-        let xDense = [];
-        let yDense = [];
-        for (let i = 0; i <= 400; i++) {
-            const x = left + (right - left) * (i / 400);
-            xDense.push(x);
-            yDense.push(poly.predict(x));
-        }
-
-        const yTrue = xDense.map(f);
-        const infError = computeInfinityNorm(yDense, yTrue);
-
-        // Update UI during sweep
-        document.getElementById("nodes").value = nodes;
-        document.getElementById("error-display").innerText = infError.toFixed(10);
-
-        Plotly.react("plot-area", [
-            {
-                x: xDense,
-                y: yDense,
-                mode: "lines",
-                name: "Polynomial Interpolation",
-                line: { color: "black", width: 3 }
-            },
-            {
-                x: xPoints,
-                y: yPoints,
-                mode: "markers",
-                name: "Nodes",
-                marker: {
-                    color: "white",
-                    size: 10,
-                    line: { color: "black", width: 2 }
-                }
-            },
-            {
-                x: xDense,
-                y: yTrue,
-                mode: "lines",
-                name: "True Function",
-                line: { color: "red", dash: "dot", width: 3 }
-            }
-        ], {
-            title: `Polynomial Interpolation (Lagrange) | Nodes: ${nodes}`,
-            xaxis: { title: "x" },
-            yaxis: { title: "y" },
-            height: 500
-        });
-
-        // Track best nodes
-        if (infError < bestError) {
-            bestError = infError;
-            bestNodes = nodes;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, delay));
-    }
-
-    // Set input UI to optimal value
-    document.getElementById("nodes").value = bestNodes;
-
-    // Smooth opacity transition to the final plot
-    document.getElementById("plot-area").style.opacity = 0;
-
-    setTimeout(() => {
-        const { xPoints: xFinal, yPoints: yFinal, left, right } = generateNodes(bestNodes);
+        const { xPoints: xFinal, yPoints: yFinal, left: leftFinal, right: rightFinal } = generateNodes(bestNodes);
         const polyFinal = new RBFInterpolator(xFinal, yFinal, 0, "POLY");
 
         let xDenseFinal = [];
         let yDenseFinal = [];
         for (let i = 0; i <= 400; i++) {
-            const x = left + (right - left) * (i / 400);
+            const x = leftFinal + (rightFinal - leftFinal) * (i / 400);
             xDenseFinal.push(x);
             yDenseFinal.push(polyFinal.predict(x));
         }
@@ -631,116 +653,113 @@ async function findBestNodesPoly() {
         });
 
         document.getElementById("plot-area").style.opacity = 1;
-    }, 150);
+
+    } finally {
+        toggleControls(false);
+    }
 }
 
 // --- Best Epsilon Animation 2D ---
 async function findBestEpsilon2D() {
-    const kernel = document.getElementById("kernel").value;
-    let nodesCount = parseInt(document.getElementById("nodes").value);
+    toggleControls(true);
 
-    let bestEpsilon = 0.1;
-    let bestError = Infinity;
+    try {
+        const kernel = document.getElementById("kernel").value;
+        let nodesCount = parseInt(document.getElementById("nodes").value);
 
-    const { pts, vals } = generateNodes2D(nodesCount);
-    const f2d = TestFunctions2D["Runge2D"];
+        let bestEpsilon = 0.1;
+        let bestError = Infinity;
 
-    const delay = 10;
-    const step = 0.05;
+        const { pts, vals } = generateNodes2D(nodesCount);
+        const f2d = TestFunctions2D["Runge2D"];
 
-    // Dense grid for error evaluation
-    const N = 40;
-    let xGrid = [];
-    let yGrid = [];
-    let zTrue = [];
+        const delay = 10;
+        const step = 0.05;
 
-    for (let i = 0; i < N; i++) {
-        const x = -1 + 2 * (i / (N - 1));
-        xGrid.push(x);
+        const N = 40;
+        let xGrid = [];
+        let yGrid = [];
+        let zTrue = [];
 
-        let row = [];
-        for (let j = 0; j < N; j++) {
-            const y = -1 + 2 * (j / (N - 1));
-            if (i === 0) yGrid.push(y);
-            row.push(f2d(x, y));
-        }
-        zTrue.push(row);
-    }
+        for (let i = 0; i < N; i++) {
+            const x = -1 + 2 * (i / (N - 1));
+            xGrid.push(x);
 
-    // Sweep epsilon
-    for (let epsilon = 0.1; epsilon <= 10; epsilon += step) {
-        try {
-            const rbf2d = new RBFInterpolator2D(pts, vals, epsilon, kernel);
-
-            let zInterp = [];
-            for (let i = 0; i < N; i++) {
-                let row = [];
-                for (let j = 0; j < N; j++) {
-                    row.push(rbf2d.predict(xGrid[i], yGrid[j]));
-                }
-                zInterp.push(row);
+            let row = [];
+            for (let j = 0; j < N; j++) {
+                const y = -1 + 2 * (j / (N - 1));
+                if (i === 0) yGrid.push(y);
+                row.push(f2d(x, y));
             }
-
-            // Compute error surface
-            let errSurface = [];
-            for (let i = 0; i < N; i++) {
-                let row = [];
-                for (let j = 0; j < N; j++) {
-                    row.push(zInterp[i][j] - zTrue[i][j]); // signed error
-                }
-                errSurface.push(row);
-            }
-
-            const infError = computeInfinityNorm2D(zInterp, zTrue);
-
-            // Live error update
-            document.getElementById("error-display").innerText =
-                infError.toFixed(10);
-
-            // Update slider visually
-            document.getElementById("epsilon").value = epsilon.toFixed(2);
-
-            // Live plot update (interpolant height, error color)
-            Plotly.react("plot-area", [{
-                x: xGrid,
-                y: yGrid,
-                z: zInterp,                // height = interpolant
-                surfacecolor: errSurface,  // color = signed error
-                type: "surface",
-                colorscale: "RdBu",        // red = positive, blue = negative
-                showscale: false
-            }], {
-                title: `2D RBF | Kernel: ${kernel} (ε = ${epsilon.toFixed(2)})`,
-                height: 500,
-                scene: {
-                    xaxis: { title: "x" },
-                    yaxis: { title: "y" },
-                    zaxis: { title: "z" }
-                }
-            });
-
-            if (infError < bestError) {
-                bestError = infError;
-                bestEpsilon = epsilon;
-            }
-
-        } catch (err) {
-            // Skip singular matrices
+            zTrue.push(row);
         }
 
-        await new Promise(r => setTimeout(r, delay));
+        for (let epsilon = 0.1; epsilon <= 10; epsilon += step) {
+            try {
+                const rbf2d = new RBFInterpolator2D(pts, vals, epsilon, kernel);
+
+                let zInterp = [];
+                for (let i = 0; i < N; i++) {
+                    let row = [];
+                    for (let j = 0; j < N; j++) {
+                        row.push(rbf2d.predict(xGrid[i], yGrid[j]));
+                    }
+                    zInterp.push(row);
+                }
+
+                let errSurface = [];
+                for (let i = 0; i < N; i++) {
+                    let row = [];
+                    for (let j = 0; j < N; j++) {
+                        row.push(zInterp[i][j] - zTrue[i][j]);
+                    }
+                    errSurface.push(row);
+                }
+
+                const infError = computeInfinityNorm2D(zInterp, zTrue);
+
+                document.getElementById("error-display").innerText = infError.toFixed(10);
+                document.getElementById("epsilon").value = epsilon.toFixed(2);
+
+                Plotly.react("plot-area", [{
+                    x: xGrid,
+                    y: yGrid,
+                    z: zInterp,
+                    surfacecolor: errSurface,
+                    type: "surface",
+                    colorscale: "RdBu",
+                    showscale: false
+                }], {
+                    title: `2D RBF | Kernel: ${kernel} (ε = ${epsilon.toFixed(2)})`,
+                    height: 500,
+                    scene: {
+                        xaxis: { title: "x" },
+                        yaxis: { title: "y" },
+                        zaxis: { title: "z" }
+                    }
+                });
+
+                if (infError < bestError) {
+                    bestError = infError;
+                    bestEpsilon = epsilon;
+                }
+
+            } catch (err) {
+                // Skip singular matrices
+            }
+
+            await new Promise(r => setTimeout(r, delay));
+        }
+
+        document.getElementById("epsilon").value = bestEpsilon.toFixed(2);
+        updatePlot2D(bestEpsilon);
+
+    } finally {
+        toggleControls(false);
     }
-
-    // Set slider to best ε
-    document.getElementById("epsilon").value = bestEpsilon.toFixed(2);
-
-    // Final plot using your normal 2D renderer
-    updatePlot2D(bestEpsilon);
 }
 
-
-
-// --- Live Event Listeners ---
+// --- Live Event Handlers ---
 function handleUpdate() {
     const is2D = document.getElementById("dimension-toggle").checked;
     if (is2D) {
@@ -750,23 +769,56 @@ function handleUpdate() {
     }
 }
 
-document.getElementById("kernel").addEventListener("change", handleUpdate);
+const functionSelect = document.getElementById("test-function");
+const kernelSelect = document.getElementById("kernel");
+const actionBtn = document.getElementById("best-epsilon-btn");
+
+function updateUIState() {
+    const kernel = kernelSelect.value;
+    const isPoly = (kernel === "POLY");
+
+    document.getElementById("epsilon").disabled = isPoly;
+
+    if (isPoly) {
+        actionBtn.innerText = "Find Best Nodes";
+    } else {
+        actionBtn.innerText = "Find Best ε";
+    }
+}
+
 document.getElementById("epsilon").addEventListener("input", handleUpdate);
 document.getElementById("nodes").addEventListener("change", handleUpdate);
 document.getElementById("test-function").addEventListener("change", handleUpdate);
 
-const functionSelect = document.getElementById("test-function");
+kernelSelect.addEventListener("change", () => {
+    updateUIState();
+    handleUpdate();
+});
 
+// Dimension toggle handling
 document.getElementById("dimension-toggle").addEventListener("change", () => {
     const is2D = document.getElementById("dimension-toggle").checked;
+    const polyOption = kernelSelect.querySelector('option[value="POLY"]');
+    const epsilonInput = document.getElementById("epsilon");
 
     if (!is2D) {
-        // Back to 1D mode
         document.getElementById("kernel").disabled = false;
-        document.getElementById("epsilon").disabled = false;
         document.getElementById("nodes").disabled = false;
         document.getElementById("test-function").disabled = false;
-        document.getElementById("best-epsilon-btn").disabled = false;
+        actionBtn.disabled = false;
+
+        if (polyOption) {
+            polyOption.disabled = false;
+            polyOption.hidden = false;
+        }
+
+        if (kernelSelect.value === "POLY") {
+            actionBtn.innerText = "Find Best Nodes";
+            epsilonInput.disabled = true;
+        } else {
+            actionBtn.innerText = "Find Best ε";
+            epsilonInput.disabled = false;
+        }
 
         functionSelect.disabled = false;
         functionSelect.innerHTML = `
@@ -782,10 +834,21 @@ document.getElementById("dimension-toggle").addEventListener("change", () => {
 
     // Switch to 2D mode
     document.getElementById("kernel").disabled = false;
-    document.getElementById("epsilon").disabled = false;
     document.getElementById("nodes").disabled = false;
     document.getElementById("test-function").disabled = true;
-    document.getElementById("best-epsilon-btn").disabled = false;   // <-- FIXED
+    actionBtn.disabled = false;
+
+    if (polyOption) {
+        polyOption.disabled = true;
+        polyOption.hidden = true;
+    }
+    
+    if (kernelSelect.value === "POLY") {
+        kernelSelect.value = "GA";
+    }
+
+    actionBtn.innerText = "Find Best ε";
+    epsilonInput.disabled = false;
 
     functionSelect.disabled = true;
     functionSelect.innerHTML = `
@@ -795,34 +858,10 @@ document.getElementById("dimension-toggle").addEventListener("change", () => {
     updatePlot2D();
 });
 
-const actionBtn = document.getElementById("best-epsilon-btn");
-
-function updateUIState() {
-    const is2D = document.getElementById("dimension-toggle").checked;
-    const kernel = document.getElementById("kernel").value;
-    const isPoly = (kernel === "POLY");
-
-    // Disable Epsilon slider for Polynomial mode
-    document.getElementById("epsilon").disabled = isPoly;
-
-    // Dynamically re-label button based on selected kernel
-    if (isPoly) {
-        actionBtn.innerText = "Find Best Nodes";
-    } else {
-        actionBtn.innerText = "Find Best ε";
-    }
-}
-
-// Attach UI handler to kernel selector
-document.getElementById("kernel").addEventListener("change", () => {
-    updateUIState();
-    handleUpdate();
-});
-
-// Route click action based on active kernel
+// Action button route logic
 actionBtn.addEventListener("click", () => {
     const is2D = document.getElementById("dimension-toggle").checked;
-    const kernel = document.getElementById("kernel").value;
+    const kernel = kernelSelect.value;
 
     if (kernel === "POLY") {
         findBestNodesPoly();
@@ -832,7 +871,6 @@ actionBtn.addEventListener("click", () => {
         findBestEpsilon();
     }
 });
-
 
 // --- Initial Plot ---
 updatePlot();

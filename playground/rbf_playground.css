@@ -1,22 +1,23 @@
 /* ============================
-   GLOBAL PAGE STYLE
+   GLOBAL RESET & LAYOUT FIX
    ============================ */
-html {
-    font-size: 80%; /* Scales all rem units down by 20% */
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    width: 100%;
 }
 
 body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: #f5f5f5;
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    font-family: Arial, Helvetica, sans-serif;
 }
 
-/* ============================
-   HEADER
-   ============================ */
 header {
     background: #222;
     color: white;
@@ -27,24 +28,23 @@ header {
 }
 
 .header-side {
-    flex: 1; 
+    flex: 1;
 }
 
 .header-side.right {
-    text-align: right; 
+    text-align: right;
 }
 
 .header-title {
     flex: 2;
     text-align: center;
-    font-size: 1.8rem;
+    font-size: 1.6rem;
     font-weight: bold;
 }
 
 .header-btn {
     background: #444;
     color: white;
-    border: none;
     border: 1px solid rgba(255, 255, 255, 0.4);
     padding: 6px 13px;
     border-radius: 5px;
@@ -55,6 +55,65 @@ header {
 
 .header-btn:hover {
     background: #666;
+}
+
+.icon-btn {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    padding: 0;
+    font-weight: bold;
+    font-size: 1.2rem;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* ============================
+   HELP POPUP
+   ============================ */
+#help-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.55);
+    display: none;
+    z-index: 900;
+}
+
+/* Popup box */
+#help-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 20px 30px;
+    width: 55vw;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    display: none;
+    z-index: 1000;
+    text-align: center;
+}
+
+#help-popup h2 {
+    margin-top: 0px 0px 0px 0px;
+    font-size: 1.6rem;
+}
+
+#help-popup p {
+    font-size: 1.1rem;
+    margin-bottom: 20px;
+}
+
+.no-bullets {
+    list-style: none;
+    padding-left: 0;
+    text-align: left;
+    margin-bottom: 16px;
 }
 
 /* ============================
@@ -185,18 +244,18 @@ input:checked + .slider:before {
 }
 
 hr {
-    margin-bottom: 13px;
+    margin-bottom: 10px;
 }
 
 #test-function, #kernel, #best-epsilon-btn {
-    margin-bottom: 13px;
+    margin-bottom: 8px;
 }
 
 /* ============================
    ERROR BOX
    ============================ */
 #error-norm-box {
-    margin-top: 8px;
+    margin-top: 6px;
     padding: 8px 5px;
     background: #f7f7f7;
     border: 2px solid #ccc;
@@ -207,7 +266,7 @@ hr {
 .error-title {
     font-size: 15px;
     font-weight: bold;
-    margin-bottom: 5px;
+    margin-bottom: 0px;
     color: #333;
 }
 
