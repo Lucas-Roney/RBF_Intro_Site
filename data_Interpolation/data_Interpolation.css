@@ -82,29 +82,30 @@ header {
     z-index: 900;
 }
 
+/* Popup box */
 #help-popup {
     position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     background: white;
-    padding: 16px 24px;
-    width: 26vw;
-    border-radius: 8px;
-    box-shadow: 0 0 16px rgba(0,0,0,0.3);
+    padding: 24px 36px;
+    width: 45vw;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
     display: none;
     z-index: 1000;
     text-align: center;
 }
 
 #help-popup h2 {
-    margin-top: 0;
-    font-size: 1.7rem;
+    margin-top: 0px 0px 0px 0px;
+    font-size: 1.92rem;
 }
 
 #help-popup p {
-    font-size: 1rem;
-    margin-bottom: 16px;
+    font-size: 1.32rem;
+    margin-bottom: 20px;
 }
 
 .no-bullets {
@@ -112,6 +113,11 @@ header {
     padding-left: 0;
     text-align: left;
     margin-bottom: 16px;
+    font-size: 1.2rem;
+}
+
+.no-bullets li {
+    margin-bottom: 2px;
 }
 
 /* ============================

@@ -1,3 +1,31 @@
+// Help Popup Logic
+const helpBtn = document.getElementById('helpBtn');
+const helpPopup = document.getElementById('help-popup');
+const helpOverlay = document.getElementById('help-overlay');
+const helpClose = document.getElementById('help-close-btn');
+
+if (helpBtn) {
+    helpBtn.addEventListener('click', () => {
+        helpOverlay.style.display = "block";
+        helpPopup.style.display = "block";
+    });
+}
+
+if (helpClose) {
+    helpClose.addEventListener('click', () => {
+        helpOverlay.style.display = "none";
+        helpPopup.style.display = "none";
+    });
+}
+
+if (helpOverlay) {
+    helpOverlay.addEventListener('click', () => {
+        helpOverlay.style.display = "none";
+        helpPopup.style.display = "none";
+    });
+}
+
+
 // =========================
 // GLOBALS
 // =========================
