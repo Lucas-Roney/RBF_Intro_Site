@@ -109,19 +109,7 @@ body {
     padding: 40px;
     flex-wrap: wrap;
     max-width: 100%;
-    gap: 70px;
-    margin: 0 auto;
-    flex: 1;
-}
-
-#options-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 40px 20px;
-    flex-wrap: wrap;
-    max-width: 1200px;
-    gap: 40px;
+    gap: 10vw;
     margin: 0 auto;
     flex: 1;
 }
@@ -129,8 +117,8 @@ body {
 .option {
     /* Responsive sizing instead of rigid 350px */
     flex: 1 1 300px;
-    max-width: 360px;
-    min-height: 360px;
+    max-width: 25vw;
+    min-height: 25vw;
     background: #ffffff;
     border-radius: 14px;
     border: 1px solid rgba(0, 0, 0, 0.08);
@@ -169,6 +157,7 @@ body {
     border-radius: 8px;
     object-fit: cover; /* Prevents image distortion */
     transition: transform 0.4s ease;
+    margin-bottom: 10px;
 }
 
 .option:hover img {
