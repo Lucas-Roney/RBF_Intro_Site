@@ -271,14 +271,6 @@ function plotRawData() {
         {
             x: rawDates,
             y: rawLevels,
-            mode: "lines",
-            name: "Kept Data",
-            line: { color: "rgba(0,0,255,0.5)", width: 2 },
-            connectgaps: false
-        },
-        {
-            x: rawDates,
-            y: rawLevels,
             mode: "markers",
             name: "Data Points",
             marker: {
@@ -583,17 +575,20 @@ function interpolate(quiet = false) {
         {
             x: rawDates.map((d, i) => cutMask[i] ? null : d),
             y: rawLevels.map((lvl, i) => cutMask[i] ? null : lvl),
-            mode: "lines",
-            name: "Kept Data",
-            line: { color: "rgba(0,0,255,0.5)", width: 2 },
-            connectgaps: false
-        },
-        {
-            x: rawDates.map((d, i) => cutMask[i] ? null : d),
-            y: rawLevels.map((lvl, i) => cutMask[i] ? null : lvl),
             mode: "markers",
             name: "Data Points",
             marker: { size: 5, color: "blue", opacity: 0.8 }
+        },
+                {
+            x: cutNodes.map(p => p.date),
+            y: cutNodes.map(p => p.level),
+            mode: "markers",
+            name: "Cut Nodes",
+            marker: {
+                color: "rgba(102, 102, 245, 0.55)",
+                size: 5,
+                symbol: "x"
+            }
         },
         {
             x: denseInterpTimes.map(t => new Date(firstTimestamp.getTime() + t * 60000)),
@@ -609,13 +604,6 @@ function interpolate(quiet = false) {
             name: "Active Nodes",
             marker: { size: 6, color: "red" }
         },
-        {
-            x: cutNodes.map(p => p.date),
-            y: cutNodes.map(p => p.level),
-            mode: "lines",
-            name: "Cut Data",
-            line: { color: "rgba(0, 0, 255, 0.3)", width: 2 }
-        }
     ], {
         title: chartTitle,
         xaxis: { title: "Date & Time" },
